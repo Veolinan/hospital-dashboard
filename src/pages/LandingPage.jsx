@@ -104,13 +104,13 @@ export default function LandingPage() {
           <div className="relative bg-white rounded-lg p-6 shadow-xl space-y-4 w-80 animate-fadeIn z-10">
             <h3 className="text-xl font-semibold text-blue-700 text-center">Login As</h3>
             <button
-              onClick={() => navigate("/adminregister")}
+              onClick={() => navigate("/login")}
               className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
             >
               Admin / Hospital
             </button>
             <button
-              onClick={() => navigate("/register-doctor")}
+              onClick={() => navigate("/login")}
               className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 transition"
             >
               Doctor

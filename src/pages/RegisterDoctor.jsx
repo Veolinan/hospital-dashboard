@@ -1,9 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { db, auth } from "../firebase";
-import { collection, addDoc, getDocs, serverTimestamp } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  serverTimestamp,
+  doc,
+  setDoc,
+} from "firebase/firestore";
 import { createUserWithEmailAndPassword } from "firebase/auth";
+import { useNavigate } from "react-router-dom";
 
-const RegisterDoctor = () => {
+export default function RegisterDoctor() {
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -14,24 +21,20 @@ const RegisterDoctor = () => {
     licenseNumber: "",
     password: "",
     hospitalId: "",
-    role: "Doctor",
+    role: "doctor",
   });
 
   const [hospitals, setHospitals] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState("");
+  const [toast, setToast] = useState("");
+  const [error, setError] = useState("");
+  const navigate = useNavigate();
 
-  // Fetch hospital list
   useEffect(() => {
-    const fetchHospitals = async () => {
-      const snapshot = await getDocs(collection(db, "hospitals"));
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        name: doc.data().name,
-      }));
-      setHospitals(data);
-    };
-
+    async function fetchHospitals() {
+      const snap = await getDocs(collection(db, "hospitals"));
+      setHospitals(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    }
     fetchHospitals();
   }, []);
 
@@ -41,32 +44,25 @@ const RegisterDoctor = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setSuccess("");
+    setError("");
+    setToast("");
 
     try {
-      // 1. Create Auth account
-      const userCredential = await createUserWithEmailAndPassword(
+      const userCred = await createUserWithEmailAndPassword(
         auth,
         form.email,
         form.password
       );
+      const uid = userCred.user.uid;
 
-      // 2. Save to Firestore
-      await addDoc(collection(db, "doctors"), {
-        uid: userCredential.user.uid,
-        fullName: form.fullName,
-        email: form.email,
-        phone: form.phone,
-        gender: form.gender,
-        specialization: form.specialization,
-        workId: form.workId,
-        licenseNumber: form.licenseNumber,
-        hospitalId: form.hospitalId,
-        role: form.role,
+      const { password, ...doctorData } = form;
+      await setDoc(doc(db, "users", uid), {
+        uid,
+        ...doctorData,
         createdAt: serverTimestamp(),
       });
 
-      setSuccess("✅ Doctor registered successfully!");
+      setToast("✅ Doctor registered successfully!");
       setForm({
         fullName: "",
         email: "",
@@ -77,119 +73,121 @@ const RegisterDoctor = () => {
         licenseNumber: "",
         password: "",
         hospitalId: "",
-        role: "Doctor",
+        role: "doctor",
       });
+
+      setTimeout(() => navigate("/login"), 2000);
     } catch (err) {
-      alert("❌ Error: " + err.message);
+      console.error(err);
+      setError("❌ " + err.message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white via-blue-100 to-blue-200 flex items-center justify-center px-4 py-10">
-      <div className="w-full max-w-lg bg-white p-10 rounded-2xl shadow-2xl border border-blue-100">
-        <h2 className="text-3xl font-bold text-blue-700 text-center mb-8">
+    <div className="min-h-screen bg-gradient-to-br from-white via-blue-100 to-blue-200 flex items-center justify-center p-6">
+      <form
+        onSubmit={handleSubmit}
+        className="bg-white p-8 rounded shadow-lg max-w-lg w-full space-y-4"
+      >
+        <h2 className="text-3xl font-bold text-blue-700 text-center">
           🧑‍⚕️ Register Doctor
         </h2>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {/* TEXT INPUTS */}
-          {[
-            { name: "fullName", label: "Full Name" },
-            { name: "email", label: "Email Address", type: "email" },
-            { name: "phone", label: "Phone Number" },
-            { name: "specialization", label: "Specialization" },
-            { name: "workId", label: "Work ID" },
-            { name: "licenseNumber", label: "License Number" },
-            { name: "password", label: "Password", type: "password" },
-          ].map(({ name, label, type = "text" }) => (
-            <div key={name}>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {label}
-              </label>
-              <input
-                type={type}
-                name={name}
-                value={form[name]}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:outline-none"
-              />
-            </div>
-          ))}
+        {error && <p className="text-red-600 text-center">{error}</p>}
+        {toast && <p className="text-green-600 text-center">{toast}</p>}
 
-          {/* GENDER SELECT */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Gender
-            </label>
-            <select
-              name="gender"
-              value={form.gender}
-              onChange={handleChange}
-              required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:outline-none"
-            >
-              <option value="">Select gender</option>
-              <option value="male">Male</option>
-              <option value="female">Female</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
-
-          {/* HOSPITAL SELECT */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Assign to Hospital
-            </label>
-            <select
-              name="hospitalId"
-              value={form.hospitalId}
-              onChange={handleChange}
-              required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:outline-none"
-            >
-              <option value="">Select hospital</option>
-              {hospitals.map((h) => (
-                <option key={h.id} value={h.id}>
-                  {h.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* ROLE (HIDDEN or preset) */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Role
-            </label>
+        {[
+          ["fullName", "Full Name"],
+          ["email", "Email Address"],
+          ["phone", "Phone Number"],
+          ["specialization", "Specialization"],
+          ["workId", "Work ID"],
+          ["licenseNumber", "License Number"],
+          ["password", "Password"],
+        ].map(([key, label]) => (
+          <div key={key}>
+            <label className="block text-gray-700 mb-1">{label}</label>
             <input
-              type="text"
-              name="role"
-              value={form.role}
-              disabled
-              className="w-full px-4 py-2 border border-gray-200 bg-gray-100 rounded-lg"
+              name={key}
+              type={key === "password" ? "password" : "text"}
+              required
+              value={form[key]}
+              onChange={handleChange}
+              className="w-full border px-4 py-2 rounded focus:ring-2 focus:ring-blue-400"
             />
           </div>
+        ))}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg transition"
+        <div>
+          <label className="block text-gray-700 mb-1">Gender</label>
+          <select
+            name="gender"
+            required
+            value={form.gender}
+            onChange={handleChange}
+            className="w-full border px-4 py-2 rounded focus:ring-2 focus:ring-blue-400"
           >
-            {loading ? "Registering..." : "Register Doctor"}
-          </button>
+            <option value="">Choose gender</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
 
-          {success && (
-            <p className="text-green-600 text-center text-sm mt-3 font-medium">
-              {success}
-            </p>
+        <div>
+          <label className="block text-gray-700 mb-1">Assign to Hospital</label>
+          <select
+            name="hospitalId"
+            required
+            value={form.hospitalId}
+            onChange={handleChange}
+            className="w-full border px-4 py-2 rounded focus:ring-2 focus:ring-blue-400"
+          >
+            <option value="">Select Hospital</option>
+            {hospitals.map((h) => (
+              <option key={h.id} value={h.id}>
+                {h.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition flex items-center justify-center"
+        >
+          {loading ? (
+            <>
+              <svg
+                className="animate-spin h-5 w-5 mr-2 text-white"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                ></path>
+              </svg>
+              Registering...
+            </>
+          ) : (
+            "Register Doctor"
           )}
-        </form>
-      </div>
+        </button>
+      </form>
     </div>
   );
-};
-
-export default RegisterDoctor;
+}
