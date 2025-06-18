@@ -12,6 +12,7 @@
     "framer-motion": "^12.18.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-hot-toast": "^2.5.2",
     "react-parallax-tilt": "^1.7.298",
     "react-router-dom": "^7.6.2",
     "react-scripts": "5.0.1",

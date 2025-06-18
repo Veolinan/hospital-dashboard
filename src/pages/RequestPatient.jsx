@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth, functions } from '../firebase';
-import { collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  addDoc,
+  serverTimestamp,
+} from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 
 export default function RequestPatient() {
@@ -17,47 +24,58 @@ export default function RequestPatient() {
   useEffect(() => {
     const fetchHospitals = async () => {
       const snap = await getDocs(collection(db, 'hospitals'));
-      setHospitals(snap.docs.map(d => ({ id: d.id, name: d.data().name })));
+      setHospitals(snap.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
     };
     fetchHospitals();
   }, []);
 
   const handleSearch = async () => {
     setError('');
-    setPatient(null);
     setSuccess('');
+    setPatient(null);
     if (!searchTerm.trim()) return setError('Enter patient code or phone');
     setLoading(true);
+
     try {
-      const q = query(
-        collection(db, 'patients'),
-        where('patientCode', '==', searchTerm.trim())
-      );
-      const snap = await getDocs(q);
-      if (snap.empty) {
-        // fallback search by phone
-        const q2 = query(collection(db, 'patients'), where('phone', '==', searchTerm.trim()));
-        const snap2 = await getDocs(q2);
-        if (snap2.empty) return setError('No patient found');
-        setPatient({ id: snap2.docs[0].id, ...snap2.docs[0].data() });
+      const byCode = query(collection(db, 'patients'), where('patientCode', '==', searchTerm.trim()));
+      const codeSnap = await getDocs(byCode);
+
+      if (!codeSnap.empty) {
+        setPatient({ id: codeSnap.docs[0].id, ...codeSnap.docs[0].data() });
       } else {
-        setPatient({ id: snap.docs[0].id, ...snap.docs[0].data() });
+        const byPhone = query(collection(db, 'patients'), where('phone', '==', searchTerm.trim()));
+        const phoneSnap = await getDocs(byPhone);
+
+        if (!phoneSnap.empty) {
+          setPatient({ id: phoneSnap.docs[0].id, ...phoneSnap.docs[0].data() });
+        } else {
+          setError('❌ No patient found');
+        }
       }
     } catch (err) {
-      console.error(err);
-      setError('Search failed');
+      console.error('Search error:', err);
+      setError('❌ Failed to search patient');
     } finally {
       setLoading(false);
     }
   };
 
   const handleRequest = async () => {
-    if (!selectedHospital) return setError('Select receiving hospital');
+    if (!selectedHospital) {
+      setError('⚠️ Select receiving hospital');
+      return;
+    }
+    if (!currentUser) {
+      setError('⚠️ Doctor must be logged in');
+      return;
+    }
 
     setLoading(true);
     setError('');
+    setSuccess('');
+
     try {
-      const ref = await addDoc(collection(db, 'recordRequests'), {
+      const requestRef = await addDoc(collection(db, 'recordRequests'), {
         patientId: patient.id,
         patientName: patient.fullName,
         requestingDoctorId: currentUser.uid,
@@ -68,17 +86,16 @@ export default function RequestPatient() {
         requestedAt: serverTimestamp(),
       });
 
-      // Trigger email via Cloud Function
-      const sendNotification = httpsCallable(functions, 'sendRecordRequestNotification');
-      await sendNotification({ requestId: ref.id });
+      const sendEmail = httpsCallable(functions, 'sendRecordRequestNotification');
+      await sendEmail({ requestId: requestRef.id });
 
-      setSuccess('Request sent successfully ✅');
+      setSuccess('✅ Request sent successfully');
       setPatient(null);
       setSearchTerm('');
       setSelectedHospital('');
     } catch (err) {
-      console.error(err);
-      setError('Failed to send request');
+      console.error('Failed to send request:', err);
+      setError('❌ Failed to send request');
     } finally {
       setLoading(false);
     }
@@ -111,12 +128,12 @@ export default function RequestPatient() {
         <>
           <div className="bg-gray-100 p-4 rounded mb-4">
             <p><strong>Name:</strong> {patient.fullName}</p>
-            <p><strong>Hospital ID:</strong> {patient.hospitalId}</p>
+            <p><strong>From hospital:</strong> {patient.hospitalId}</p>
             <p><strong>Code:</strong> {patient.patientCode}</p>
           </div>
 
           <div className="mb-4">
-            <label className="block mb-1 font-medium">Request to Hospital:</label>
+            <label className="block mb-1 font-medium">Request to</label>
             <select
               value={selectedHospital}
               onChange={e => setSelectedHospital(e.target.value)}

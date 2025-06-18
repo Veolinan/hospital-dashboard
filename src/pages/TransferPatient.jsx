@@ -1,130 +1,147 @@
-import React, { useState, useEffect } from "react";
+// src/pages/TransferPatient.jsx
+import React, { useEffect, useState } from "react";
 import { db, auth, functions } from "../firebase";
 import {
   collection,
-  query,
-  where,
   getDocs,
   doc,
+  getDoc,
   updateDoc,
   setDoc,
   serverTimestamp
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
+import toast from "react-hot-toast";
 
 export default function TransferPatient() {
   const [requests, setRequests] = useState([]);
-  const [filteredRequests, setFilteredRequests] = useState([]);
   const [hospitals, setHospitals] = useState([]);
-  const [statusFilter, setStatusFilter] = useState("pending");
+  const [filter, setFilter] = useState("pending");
   const [loading, setLoading] = useState(false);
+  const [hospitalMap, setHospitalMap] = useState({});
 
-  // Fetch requests and hospitals
   useEffect(() => {
     const fetchData = async () => {
       const reqSnap = await getDocs(collection(db, "recordRequests"));
-      const allRequests = reqSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setRequests(allRequests);
-      setFilteredRequests(allRequests.filter(r => r.status === statusFilter));
+      const hosSnap = await getDocs(collection(db, "hospitals"));
 
-      const hospSnap = await getDocs(collection(db, "hospitals"));
-      setHospitals(hospSnap.docs.map(d => ({ id: d.id, name: d.data().name })));
+      const hosData = {};
+      hosSnap.docs.forEach(doc => {
+        hosData[doc.id] = doc.data().name;
+      });
+
+      setHospitalMap(hosData);
+      setRequests(reqSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setHospitals(hosSnap.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
     };
 
     fetchData();
-  }, [statusFilter]);
+  }, []);
 
-  const handleAction = async (req, action, targetHospitalId) => {
+  const handleAction = async (req, action, targetHospitalId = null) => {
+    const reqRef = doc(db, "recordRequests", req.id);
     setLoading(true);
 
     try {
-      const reqDoc = doc(db, "recordRequests", req.id);
-
       if (action === "approve") {
-        await updateDoc(reqDoc, { status: "approved", statusUpdatedAt: serverTimestamp() });
+        await updateDoc(reqRef, {
+          status: "approved",
+          statusUpdatedAt: serverTimestamp(),
+        });
+        toast.success("Request approved ✅");
       }
 
       if (action === "decline") {
-        await updateDoc(reqDoc, { status: "declined", statusUpdatedAt: serverTimestamp() });
+        await updateDoc(reqRef, {
+          status: "declined",
+          statusUpdatedAt: serverTimestamp(),
+        });
+        toast.error("Request declined");
       }
 
       if (action === "transfer" && targetHospitalId) {
-        // Fetch patient
-        const patientDoc = await getDocs(doc(db, "patients", req.patientId));
-        const patientData = patientDoc.data();
+        const patientRef = doc(db, "patients", req.patientId);
+        const patientSnap = await getDoc(patientRef);
 
-        // Create patient copy
-        await setDoc(
-          doc(db, "patients", patientDoc.id + "_" + targetHospitalId),
-          { ...patientData, hospitalId: targetHospitalId, createdAt: serverTimestamp() }
-        );
+        if (!patientSnap.exists()) {
+          throw new Error("Patient not found");
+        }
 
-        // Update original
-        await updateDoc(reqDoc, {
-          status: "transferred",
-          statusUpdatedAt: serverTimestamp(),
-          transferredBy: auth.currentUser.uid,
-          toHospitalId: targetHospitalId,
+        const patientData = patientSnap.data();
+        const newPatientId = `${req.patientId}_${targetHospitalId}`;
+
+        await setDoc(doc(db, "patients", newPatientId), {
+          ...patientData,
+          hospitalId: targetHospitalId,
+          transferredFrom: patientData.hospitalId,
+          transferCreatedAt: serverTimestamp(),
         });
 
-        // Notify via cloud function
-        const notify = httpsCallable(functions, "sendTransferNotification");
-        await notify({ requestId: req.id });
+        await updateDoc(reqRef, {
+          status: "transferred",
+          transferredBy: auth.currentUser.uid,
+          toHospitalId: targetHospitalId,
+          statusUpdatedAt: serverTimestamp(),
+        });
+
+        const sendTransferEmail = httpsCallable(functions, "sendTransferNotification");
+        await sendTransferEmail({ requestId: req.id });
+
+        toast.success("Patient transferred and emails sent ✅");
       }
 
       // Refresh requests
-      const snapshot = await getDocs(collection(db, "recordRequests"));
-      const updated = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      setRequests(updated);
-      setFilteredRequests(updated.filter(r => r.status === statusFilter));
+      const reqSnap = await getDocs(collection(db, "recordRequests"));
+      setRequests(reqSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     } catch (err) {
       console.error(err);
-      alert("Action failed: " + err.message);
+      toast.error("❌ Error: " + err.message);
     } finally {
       setLoading(false);
     }
   };
 
+  const filteredRequests = requests.filter(req => req.status === filter);
+
   return (
     <div className="max-w-5xl mx-auto p-6 bg-white rounded shadow">
-      <h2 className="text-xl font-bold mb-4">🩺 Manage Transfer Requests</h2>
+      <h2 className="text-xl font-bold mb-4">🔁 Patient Transfer Requests</h2>
 
-      <div className="flex items-center gap-4 mb-6">
-        <label>Status Filter:</label>
-        <select
-          value={statusFilter}
-          onChange={e => setStatusFilter(e.target.value)}
-          className="border px-3 py-2 rounded"
-        >
-          {["pending", "approved", "transferred", "declined"].map(s => (
-            <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
-          ))}
-        </select>
-      </div>
+      <select
+        value={filter}
+        onChange={(e) => setFilter(e.target.value)}
+        className="mb-6 border px-3 py-2 rounded"
+      >
+        {["pending", "approved", "transferred", "declined"].map((status) => (
+          <option key={status} value={status}>
+            {status.charAt(0).toUpperCase() + status.slice(1)}
+          </option>
+        ))}
+      </select>
 
       {filteredRequests.length === 0 ? (
-        <p>No requests with status <strong>{statusFilter}</strong>.</p>
+        <p>No requests to show.</p>
       ) : (
-        filteredRequests.map(req => (
+        filteredRequests.map((req) => (
           <div key={req.id} className="mb-4 p-4 border rounded">
-            <p><strong>Patient ID:</strong> {req.patientId}</p>
-            <p><strong>From Hospital ID:</strong> {req.fromHospitalId}</p>
-            <p><strong>Requested by:</strong> {req.requestingDoctorId}</p>
+            <p><strong>Patient:</strong> {req.patientName || req.patientId}</p>
+            <p><strong>From:</strong> {hospitalMap[req.fromHospitalId] || req.fromHospitalId}</p>
+            <p><strong>Requested by:</strong> {req.requestingDoctorEmail}</p>
             <p><strong>Status:</strong> {req.status}</p>
 
             {req.status === "pending" && (
-              <div className="mt-3 space-x-2">
+              <div className="mt-2 flex gap-2">
                 <button
-                  onClick={() => handleAction(req, "approve")}
                   disabled={loading}
-                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                  onClick={() => handleAction(req, "approve")}
+                  className="bg-green-600 text-white px-4 py-2 rounded"
                 >
                   Approve
                 </button>
                 <button
-                  onClick={() => handleAction(req, "decline")}
                   disabled={loading}
-                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                  onClick={() => handleAction(req, "decline")}
+                  className="bg-red-600 text-white px-4 py-2 rounded"
                 >
                   Decline
                 </button>
@@ -132,21 +149,23 @@ export default function TransferPatient() {
             )}
 
             {req.status === "approved" && (
-              <div className="mt-3 flex items-center gap-3">
+              <div className="mt-3 flex items-center gap-2">
                 <select
                   defaultValue=""
-                  onChange={e => req.selected = e.target.value}
-                  className="border px-3 py-2 rounded"
+                  onChange={(e) => req.toHospitalId = e.target.value}
+                  className="border px-2 py-1 rounded"
                 >
-                  <option value="">Select new hospital...</option>
-                  {hospitals.map(h => (
-                    <option key={h.id} value={h.id}>{h.name}</option>
+                  <option value="">Select Hospital</option>
+                  {hospitals.map((h) => (
+                    <option key={h.id} value={h.id}>
+                      {h.name}
+                    </option>
                   ))}
                 </select>
                 <button
-                  onClick={() => handleAction(req, "transfer", req.selected)}
-                  disabled={loading || !req.selected}
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                  disabled={loading || !req.toHospitalId}
+                  onClick={() => handleAction(req, "transfer", req.toHospitalId)}
+                  className="bg-blue-600 text-white px-4 py-2 rounded"
                 >
                   Transfer
                 </button>

@@ -57,10 +57,29 @@ export default function DoctorDashboard() {
 
   const navLinks = [
     { to: "/registerpatient", label: "Register Patient" },
+    { to: "/all-patients", label: "All Patients" },
     { to: "/flagged-patients", label: "Flagged Patients" },
-    { to: "/patient-reports", label: "Patient Reports" },
     { to: "/dormant-patients", label: "Dormant Patients" },
+    { to: "/patient-reports", label: "Patient Reports" },
+    { to: "/request-patient", label: "Request Patient Info" },
+    { to: "/requests", label: "Requests Made" },
+    { to: "/question-builder", label: "Questionnaire Builder" },
   ];
+
+  const groupedNav = {
+    "Patient Management": [
+      { to: "/register-patient", label: "Register Patient", color: "bg-blue-600" },
+      { to: "/all-patients", label: "All Patients", color: "bg-indigo-600" },
+      { to: "/flagged-patients", label: "Flagged Patients", color: "bg-red-500" },
+      { to: "/dormant-patients", label: "Dormant Patients", color: "bg-yellow-500" },
+      { to: "/patient-reports", label: "Patient Reports", color: "bg-green-600" },
+    ],
+    "Admin Tools": [
+      { to: "/request-patient", label: "Request Patient Info", color: "bg-purple-500" },
+      { to: "/requests", label: "Requests Made", color: "bg-pink-600" },
+      { to: "/question-builder", label: "Questionnaire Builder", color: "bg-gray-700" },
+    ]
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800">
@@ -102,30 +121,29 @@ export default function DoctorDashboard() {
       </header>
 
       {/* Main Content */}
-      <main className="p-6 max-w-7xl mx-auto space-y-8">
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {navLinks.map((btn, index) => {
-            const colors = ["bg-blue-500", "bg-red-500", "bg-green-500", "bg-yellow-500"];
-            return (
-              <Link
-                key={btn.to}
-                to={btn.to}
-                className={`${colors[index]} text-white p-5 rounded-lg text-center text-sm font-semibold hover:opacity-90 transition`}
-              >
-                {btn.label}
-              </Link>
-            );
-          })}
-        </div>
+      <main className="p-6 max-w-7xl mx-auto space-y-10">
+        {/* Action Buttons */}
+        {Object.entries(groupedNav).map(([section, links]) => (
+          <section key={section}>
+            <h2 className="text-lg font-semibold mb-4">{section}</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              {links.map((btn) => (
+                <Link
+                  key={btn.to}
+                  to={btn.to}
+                  className={`${btn.color} text-white p-5 rounded-lg text-center text-sm font-semibold hover:opacity-90 transition`}
+                >
+                  {btn.label}
+                </Link>
+              ))}
+            </div>
+          </section>
+        ))}
 
         {/* Counters */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {["flagged", "booked", "resolved"].map((key) => (
-            <div
-              key={key}
-              className="bg-white p-6 rounded-lg shadow text-center"
-            >
+            <div key={key} className="bg-white p-6 rounded-lg shadow text-center">
               <p className="text-sm uppercase text-gray-500">{key}</p>
               <p className="text-4xl font-bold text-blue-700">{counts[key]}</p>
             </div>
@@ -134,7 +152,7 @@ export default function DoctorDashboard() {
 
         {/* Chart */}
         <section className="bg-white p-6 rounded-lg shadow">
-          <h2 className="text-lg font-semibold mb-4 text-gray-800">Flagged Cases Over Time</h2>
+          <h2 className="text-lg font-semibold mb-4 text-gray-800">📊 Flagged Cases Over Time</h2>
           <Suspense fallback={<div className="h-48 flex justify-center items-center text-gray-500">Loading chart...</div>}>
             <LineChartStats data={trendData} loading={isLoading} />
           </Suspense>

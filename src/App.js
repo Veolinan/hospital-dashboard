@@ -19,6 +19,7 @@ import DormantPatients from "./pages/DormantPatients";
 import RequestPatient from "./pages/RequestPatient";
 import Requests from "./pages/Requests"; 
 import TransferPatient from "./pages/TransferPatient";
+import AllPatients from "./pages/AllPatients"; // Assuming you have this page
 
 
 function App() {
@@ -44,6 +45,7 @@ function App() {
         <Route path="/request-patient" element={<RequestPatient />} />
         <Route path="/requests" element={<Requests />} />
         <Route path="/transfer-patient" element={<TransferPatient />} />
+        <Route path="/all-patients" element={<AllPatients />} />
         {/* Add more routes as needed */}
       
 
