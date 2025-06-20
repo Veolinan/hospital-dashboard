@@ -25,7 +25,12 @@ export default function QuestionBuilder() {
   const addQuestion = () => {
     setQuestions(prev => [
       ...prev,
-      { order: prev.length + 1, isRoot: false, text: '', choices: [{ label: '', leadsTo: '', flag: '' }] }
+      {
+        order: prev.length + 1,
+        isRoot: false,
+        text: '',
+        choices: [{ label: '', leadsTo: '', flag: '' }],
+      },
     ]);
   };
 
@@ -177,28 +182,51 @@ export default function QuestionBuilder() {
             </select>
           </div>
 
+          {/* Add Question button above table */}
+          <div className="flex justify-end mb-3">
+            <button onClick={addQuestion} className="px-3 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-sm">
+              ➕ Add Question
+            </button>
+          </div>
+
           <DragDropContext onDragEnd={onDragEnd}>
             <Droppable droppableId="questions">
               {provided => (
                 <table ref={provided.innerRef} {...provided.droppableProps} className="w-full border">
                   <thead className="bg-gray-100">
                     <tr>
-                      <th>#</th><th>Root?</th><th>Question</th><th>Choices</th>
+                      <th className="p-2">#</th>
+                      <th className="p-2">Root?</th>
+                      <th className="p-2">Question</th>
+                      <th className="p-2">Choices</th>
                     </tr>
                   </thead>
                   <tbody>
                     {questions.map((q, qi) => (
                       <Draggable key={qi} draggableId={`q-${qi}`} index={qi}>
                         {prov => (
-                          <tr ref={prov.innerRef} {...prov.draggableProps} className={errors[`q-${qi}`] ? 'bg-red-100' : ''}>
-                            <td {...prov.dragHandleProps}>{q.order}</td>
-                            <td><input type="checkbox" checked={q.isRoot} onChange={e => updateQuestion(qi, 'isRoot', e.target.checked)} /></td>
-                            <td><input
-                              value={q.text}
-                              onChange={e => updateQuestion(qi, 'text', e.target.value)}
-                              className="w-full border p-1 rounded"
-                            /></td>
-                            <td>
+                          <tr
+                            ref={prov.innerRef}
+                            {...prov.draggableProps}
+                            className={errors[`q-${qi}`] ? 'bg-red-100' : ''}
+                          >
+                            <td className="p-2" {...prov.dragHandleProps}>{q.order}</td>
+                            <td className="p-2">
+                              <input
+                                type="checkbox"
+                                checked={q.isRoot}
+                                onChange={e => updateQuestion(qi, 'isRoot', e.target.checked)}
+                              />
+                            </td>
+                            <td className="p-2">
+                              <input
+                                value={q.text}
+                                onChange={e => updateQuestion(qi, 'text', e.target.value)}
+                                className="w-full border p-1 rounded"
+                                placeholder="Enter question..."
+                              />
+                            </td>
+                            <td className="p-2">
                               {q.choices.map((c, ci) => (
                                 <div key={ci} className={`flex gap-2 mb-1 ${errors[`q-${qi}-c-${ci}`] ? 'bg-red-50 p-1 rounded' : ''}`}>
                                   <input
