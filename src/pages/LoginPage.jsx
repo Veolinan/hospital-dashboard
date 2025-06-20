@@ -29,7 +29,7 @@ export default function LoginPage() {
             navigate('/doctor-dashboard');
             break;
           case 'admin':
-            navigate('/hospital-dashboard');
+            navigate('/admin');
             break;
           case 's-admin':
             navigate('/admin-dashboard');

@@ -15,8 +15,8 @@ const Questionnaire = () => {
   const navigate = useNavigate();
   const patient = state?.patient;
 
-  const [stage, setStage] = useState(null); // { type, range }
-  const [step, setStep] = useState(0); // 0=choose stage, 1=range, 2=start questions
+  const [stage, setStage] = useState(null);
+  const [step, setStep] = useState(0); // 0=type, 1=range, 2=questions
   const [questions, setQuestions] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState({});
@@ -24,99 +24,79 @@ const Questionnaire = () => {
   const [finished, setFinished] = useState(false);
 
   useEffect(() => {
-    if (!patient) return navigate('/login-patient');
+    if (!patient) navigate('/login-patient');
   }, [patient, navigate]);
 
   useEffect(() => {
-    const fetchRootQuestion = async () => {
-      if (!stage) return;
+    const fetchQuestions = async () => {
+      if (!stage?.type || !stage?.range) return;
       const q = query(
         collection(db, 'questionnaires'),
         where('stageType', '==', stage.type),
-        where('stageRange', '==', stage.range),
-        where('isRoot', '==', true)
+        where('stageRange', '==', stage.range)
       );
       const snap = await getDocs(q);
-      if (!snap.empty) {
-        const rootDoc = snap.docs[0];
-        setQuestions([{ id: rootDoc.id, ...rootDoc.data() }]);
-        setStep(2);
-      } else {
-        console.error("No root question found");
-      }
+      const list = snap.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
+      setQuestions(list);
+      setStep(2);
     };
-    fetchRootQuestion();
+    fetchQuestions();
   }, [stage]);
 
-  const handleAnswer = async (label) => {
-    const q = questions[currentIndex];
-    const choice = q.choices.find(c => c.label === label);
-    if (!choice) return;
-
-    setAnswers(prev => ({ ...prev, [q.id]: label }));
-    if (choice.flag) setFlags(prev => [...prev, choice.flag]);
-
-    if (choice.leadsTo) {
-      const nextSnap = await getDocs(
-        query(collection(db, 'questionnaires'), where("__name__", "==", choice.leadsTo))
-      );
-      if (!nextSnap.empty) {
-        setQuestions(prev => [...prev, { id: nextSnap.docs[0].id, ...nextSnap.docs[0].data() }]);
-        setCurrentIndex(prev => prev + 1);
-        return;
-      }
+  const handleAnswer = (label, question) => {
+    const choice = question.choices.find(c => c.label === label);
+    setAnswers(prev => ({ ...prev, [question.id]: label }));
+    if (choice?.flag) setFlags(prev => [...prev, choice.flag]);
+    if (currentIndex + 1 < questions.length) {
+      setCurrentIndex(prev => prev + 1);
+    } else {
+      setFinished(true);
     }
-
-    // No further questions
-    setFinished(true);
   };
 
   const handleSubmit = async () => {
-  const responseData = {
-    patientId: patient.id,
-    patientName: patient.fullName,
-    hospitalId: patient.hospitalId || null,
-    stage,
-    responses: answers,
-    flags,
-    submittedAt: serverTimestamp()
+    const responseData = {
+      patientId: patient.id,
+      patientName: patient.fullName,
+      hospitalId: patient.hospitalId || null,
+      doctorId: patient.registeredBy || null,
+      stage,
+      responses: answers,
+      flags,
+      submittedAt: serverTimestamp()
+    };
+
+    await addDoc(collection(db, 'responses'), responseData);
+    auth.signOut();
+    navigate('/');
   };
 
-  if (patient.registeredBy) {
-    responseData.doctorId = patient.registeredBy;
-  }
-
-  await addDoc(collection(db, 'responses'), responseData);
-
-  auth.signOut();
-  navigate('/');
-};
-
-
-  // Step 0: Choose if pregnant or postpartum
+  // Step 0: Choose type
   if (step === 0) {
     return (
       <div className="min-h-screen flex justify-center items-center">
         <div className="bg-white p-6 rounded shadow max-w-md w-full">
           <h2 className="text-lg font-bold mb-4">Are you currently:</h2>
-          <button onClick={() => { setStage({ type: 'pregnant' }); setStep(1); }}
-            className="w-full bg-emerald-100 hover:bg-emerald-200 px-4 py-2 mb-3 rounded">
-            🤰 Pregnant
-          </button>
-          <button onClick={() => { setStage({ type: 'postpartum' }); setStep(1); }}
-            className="w-full bg-blue-100 hover:bg-blue-200 px-4 py-2 rounded">
-            🍼 Postpartum
-          </button>
+          <button
+            onClick={() => { setStage({ type: 'pregnant' }); setStep(1); }}
+            className="w-full bg-emerald-100 hover:bg-emerald-200 px-4 py-2 mb-3 rounded"
+          >🤰 Pregnant</button>
+          <button
+            onClick={() => { setStage({ type: 'postpartum' }); setStep(1); }}
+            className="w-full bg-blue-100 hover:bg-blue-200 px-4 py-2 rounded"
+          >🍼 Postpartum</button>
         </div>
       </div>
     );
   }
 
-  // Step 1: Choose stage range
+  // Step 1: Choose range
   if (step === 1) {
     const ranges = stage.type === 'pregnant'
-      ? ["1–3 months", "4–6 months", "7–9 months"]
-      : ["0–6 days", "1–6 weeks", "7+ weeks"];
+      ? ['1–3 months', '4–6 months', '7–9 months']
+      : ['1–4 weeks', '4–8 weeks', '8–20 weeks', '6–9 months', '10–12 months'];
     return (
       <div className="min-h-screen flex justify-center items-center">
         <div className="bg-white p-6 rounded shadow max-w-md w-full">
@@ -125,7 +105,8 @@ const Questionnaire = () => {
             <button
               key={i}
               onClick={() => setStage(prev => ({ ...prev, range: r }))}
-              className="w-full bg-gray-100 hover:bg-gray-200 px-4 py-2 mb-3 rounded">
+              className="w-full bg-gray-100 hover:bg-gray-200 px-4 py-2 mb-3 rounded"
+            >
               {r}
             </button>
           ))}
@@ -134,7 +115,7 @@ const Questionnaire = () => {
     );
   }
 
-  // Step 2: Display questions
+  // Step 2: Questionnaire done
   if (step === 2 && finished) {
     return (
       <div className="min-h-screen flex justify-center items-center px-4">
@@ -158,7 +139,7 @@ const Questionnaire = () => {
   }
 
   const current = questions[currentIndex];
-  if (!current) return <p className="text-center mt-10">Loading questionnaire...</p>;
+  if (!current) return <p className="text-center mt-10">Loading questions...</p>;
 
   return (
     <div className="min-h-screen flex justify-center items-center px-4 py-10">
@@ -168,7 +149,7 @@ const Questionnaire = () => {
           {current.choices.map((c, i) => (
             <button
               key={i}
-              onClick={() => handleAnswer(c.label)}
+              onClick={() => handleAnswer(c.label, current)}
               className="block w-full bg-emerald-100 hover:bg-emerald-200 px-4 py-2 rounded"
             >
               {c.label}

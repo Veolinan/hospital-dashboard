@@ -55,8 +55,9 @@ export default function DoctorDashboard() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Dropdown links
   const navLinks = [
-    { to: "/registerpatient", label: "Register Patient" },
+    { to: "/register-patient", label: "Register Patient" },
     { to: "/all-patients", label: "All Patients" },
     { to: "/flagged-patients", label: "Flagged Patients" },
     { to: "/dormant-patients", label: "Dormant Patients" },
@@ -66,6 +67,7 @@ export default function DoctorDashboard() {
     { to: "/question-builder", label: "Questionnaire Builder" },
   ];
 
+  // Dashboard cards
   const groupedNav = {
     "Patient Management": [
       { to: "/register-patient", label: "Register Patient", color: "bg-blue-600" },
@@ -83,7 +85,7 @@ export default function DoctorDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800">
-      {/* Top Navigation */}
+      {/* Header */}
       <header className="flex justify-between items-center p-4 bg-white shadow-md">
         <h1 className="text-xl font-semibold text-blue-600">Doctor Dashboard</h1>
         <div className="relative" ref={dropdownRef}>
@@ -122,7 +124,7 @@ export default function DoctorDashboard() {
 
       {/* Main Content */}
       <main className="p-6 max-w-7xl mx-auto space-y-10">
-        {/* Action Buttons */}
+        {/* Navigation Cards */}
         {Object.entries(groupedNav).map(([section, links]) => (
           <section key={section}>
             <h2 className="text-lg font-semibold mb-4">{section}</h2>
@@ -140,7 +142,7 @@ export default function DoctorDashboard() {
           </section>
         ))}
 
-        {/* Counters */}
+        {/* Summary Counters */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {["flagged", "booked", "resolved"].map((key) => (
             <div key={key} className="bg-white p-6 rounded-lg shadow text-center">
@@ -150,7 +152,7 @@ export default function DoctorDashboard() {
           ))}
         </section>
 
-        {/* Chart */}
+        {/* Flag Trend Chart */}
         <section className="bg-white p-6 rounded-lg shadow">
           <h2 className="text-lg font-semibold mb-4 text-gray-800">📊 Flagged Cases Over Time</h2>
           <Suspense fallback={<div className="h-48 flex justify-center items-center text-gray-500">Loading chart...</div>}>
