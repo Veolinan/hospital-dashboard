@@ -95,9 +95,36 @@ export default function PreviewQuestionnaire() {
     }
   };
 
+  const addChoice = (qi) => {
+    const qs = [...questions];
+    qs[qi].choices.push({ label: '', leadsTo: '', flag: '' });
+    setQuestions(qs);
+  };
+
+  const removeChoice = (qi, ci) => {
+    const qs = [...questions];
+    if (qs[qi].choices.length > 1) {
+      qs[qi].choices.splice(ci, 1);
+      setQuestions(qs);
+    } else {
+      toast.warn('⚠️ At least one choice is required.');
+    }
+  };
+
+  const deleteQuestion = async (qi) => {
+    const confirm = window.confirm('Delete this entire question?');
+    if (!confirm) return;
+    const id = questions[qi].id;
+    const qs = [...questions];
+    qs.splice(qi, 1);
+    await deleteDoc(doc(db, 'questionnaires', id));
+    setQuestions(qs);
+    buildTree(qs);
+  };
+
   return (
     <div className="relative">
-      {/* Blurred Overlay + Spinner */}
+      {/* Saving Overlay */}
       {saving && (
         <>
           <div className="fixed inset-0 bg-white bg-opacity-30 backdrop-blur-sm z-50" />
@@ -108,19 +135,19 @@ export default function PreviewQuestionnaire() {
         </>
       )}
 
-      {/* Header */}
       <div className="p-6 max-w-6xl mx-auto space-y-6">
+        {/* Header */}
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold">Questionnaire Preview</h2>
-          <div>
-            <button onClick={() => setViewMode('graph')} className={`px-4 py-2 ${viewMode === 'graph' ? 'bg-blue-600 text-white' : 'bg-gray-200'} rounded`}>Graph</button>
-            <button onClick={() => setViewMode('table')} className={`px-4 py-2 ml-2 ${viewMode === 'table' ? 'bg-blue-600 text-white' : 'bg-gray-200'} rounded`}>Table</button>
+          <div className="space-x-2">
+            <button onClick={() => setViewMode('graph')} className={`px-4 py-2 rounded ${viewMode === 'graph' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>Graph</button>
+            <button onClick={() => setViewMode('table')} className={`px-4 py-2 rounded ${viewMode === 'table' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>Table</button>
           </div>
         </div>
 
         {/* Graph View */}
         {viewMode === 'graph' && (
-          <div className="h-96 border bg-white shadow-md overflow-auto">
+          <div className="h-[28rem] border bg-white shadow-md overflow-auto">
             {nodes ? (
               <Tree data={nodes} orientation="vertical" translate={{ x: 400, y: 50 }} collapsible={false} />
             ) : <p>Loading map...</p>}
@@ -129,28 +156,29 @@ export default function PreviewQuestionnaire() {
 
         {/* Table View */}
         {viewMode === 'table' && (
-          <div className="bg-white p-4 shadow rounded">
+          <div className="bg-white p-4 shadow rounded space-y-4">
             <table className="table-auto w-full border-collapse">
               <thead>
-                <tr className="bg-gray-100">
+                <tr className="bg-gray-100 text-left">
                   <th className="p-2">Order</th>
                   <th className="p-2">Root?</th>
                   <th className="p-2">Question</th>
                   <th className="p-2">Choices</th>
+                  <th className="p-2">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {questions.map((q, qi) => (
-                  <tr key={qi}>
-                    <td className="p-2 border">{q.order}</td>
-                    <td className="p-2 border text-center">
+                  <tr key={qi} className="border-t">
+                    <td className="p-2">{q.order}</td>
+                    <td className="p-2 text-center">
                       <input type="checkbox" checked={q.isRoot} onChange={e => {
                         const qs = [...questions];
                         qs[qi].isRoot = e.target.checked;
                         setQuestions(qs);
                       }} />
                     </td>
-                    <td className={`p-2 border ${errors[`q-${qi}`] ? 'bg-red-100' : ''}`}>
+                    <td className={`p-2 ${errors[`q-${qi}`] ? 'bg-red-100' : ''}`}>
                       <input
                         value={q.text}
                         onChange={e => {
@@ -159,57 +187,64 @@ export default function PreviewQuestionnaire() {
                           setQuestions(qs);
                         }}
                         className="w-full border rounded p-1"
+                        placeholder="Enter question..."
                       />
                     </td>
-                    <td className="p-2 border">
+                    <td className="p-2 space-y-2">
                       {q.choices.map((c, ci) => (
-                        <div key={ci} className="flex items-center space-x-2 mb-2">
+                        <div key={ci} className={`flex items-center gap-2 ${errors[`q-${qi}-c-${ci}`] ? 'bg-red-50 p-1 rounded' : ''}`}>
                           <input
                             value={c.label}
-                            placeholder="Label"
                             onChange={e => {
                               const qs = [...questions];
                               qs[qi].choices[ci].label = e.target.value;
                               setQuestions(qs);
                             }}
                             className="border p-1 rounded"
+                            placeholder="Label"
                           />
                           <input
                             type="number"
                             value={c.leadsTo}
-                            placeholder="LeadsTo"
                             onChange={e => {
                               const qs = [...questions];
-                              qs[qi].choices[ci].leadsTo = parseInt(e.target.value);
+                              qs[qi].choices[ci].leadsTo = parseInt(e.target.value) || '';
                               setQuestions(qs);
                             }}
                             className="border p-1 rounded w-20"
+                            placeholder="LeadsTo"
                           />
                           <input
                             value={c.flag}
-                            placeholder="Flag"
                             onChange={e => {
                               const qs = [...questions];
                               qs[qi].choices[ci].flag = e.target.value;
                               setQuestions(qs);
                             }}
                             className="border p-1 rounded"
+                            placeholder="Flag (optional)"
                           />
+                          <button onClick={() => removeChoice(qi, ci)} className="text-red-500 hover:text-red-700 text-lg" title="Remove Choice">❌</button>
                         </div>
                       ))}
+                      <button onClick={() => addChoice(qi)} className="text-sm text-blue-600 hover:underline mt-2">+ Add Choice</button>
+                    </td>
+                    <td className="p-2 text-center">
+                      <button onClick={() => deleteQuestion(qi)} className="text-red-600 hover:text-red-800 text-sm">🗑 Delete</button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+
             <div className="mt-4 flex justify-between">
-              <button onClick={onSaveTable} className="px-4 py-2 bg-green-600 text-white rounded">💾 Save Edits</button>
-              <button onClick={() => navigate('/question-builder')} className="px-4 py-2 bg-gray-200 rounded">← Back to Builder</button>
+              <button onClick={onSaveTable} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition">💾 Save Edits</button>
+              <button onClick={() => navigate('/question-builder')} className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 transition">← Back to Builder</button>
             </div>
           </div>
         )}
 
-        {/* Graph Path View */}
+        {/* Decision Paths in Graph View */}
         {paths.length > 0 && viewMode === 'graph' && (
           <section>
             <h3 className="text-xl font-semibold">Decision Paths</h3>
