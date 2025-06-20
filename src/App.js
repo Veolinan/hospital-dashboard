@@ -67,6 +67,7 @@ function App() {
         <Route path="/patient-reports" element={<PatientReports />} />
         <Route path="/request-patient" element={<RequestPatient />} />
         <Route path="/requests" element={<Requests />} />
+        <Route path="/question-preview" element={<PreviewQuestion />} />
 
         {/* 🏥 Hospital Admin Pages (Nested Routes) */}
         <Route path="/admin" element={<HospitalAdminDashboard />}>
