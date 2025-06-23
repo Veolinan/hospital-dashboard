@@ -1,3 +1,4 @@
+// src/pages/DoctorDashboard.jsx
 import React, { useState, useEffect, lazy, Suspense, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { db, auth } from "../firebase";
@@ -5,27 +6,33 @@ import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { ChevronDownIcon } from "@heroicons/react/24/outline";
 import { signOut } from "firebase/auth";
 
+import DoctorNavbar from "../components/DoctorNavbar";
+
 const LineChartStats = lazy(() => import("../components/FlaggedLineChart"));
 
 export default function DoctorDashboard() {
+  const navigate = useNavigate();
+  const dropdownRef = useRef(null);
+
   const [counts, setCounts] = useState({ flagged: 0, booked: 0, resolved: 0 });
   const [trendData, setTrendData] = useState([]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const dropdownRef = useRef(null);
-  const navigate = useNavigate();
 
   useEffect(() => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
 
-    const q = query(collection(db, "flaggedCases"), where("assignedTo", "==", uid));
-    const unsub = onSnapshot(q, (snap) => {
+    const q = query(
+      collection(db, "flaggedCases"),
+      where("assignedTo", "==", uid)
+    );
+    const unsub = onSnapshot(q, snap => {
       const tally = { flagged: 0, booked: 0, resolved: 0 };
       const dayCounts = {};
 
-      snap.docs.forEach((d) => {
+      snap.docs.forEach(d => {
         const c = d.data();
-        tally[c.status] += 1;
+        tally[c.status] = (tally[c.status] || 0) + 1;
         const date = c.flaggedAt?.toDate().toLocaleDateString();
         if (date) dayCounts[date] = (dayCounts[date] || 0) + 1;
       });
@@ -46,16 +53,15 @@ export default function DoctorDashboard() {
   };
 
   useEffect(() => {
-    function handleClickOutside(e) {
+    const handleClickOutside = e => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setDropdownOpen(false);
       }
-    }
+    };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Dropdown links
   const navLinks = [
     { to: "/register-patient", label: "Register Patient" },
     { to: "/all-patients", label: "All Patients" },
@@ -67,7 +73,6 @@ export default function DoctorDashboard() {
     { to: "/question-builder", label: "Questionnaire Builder" },
   ];
 
-  // Dashboard cards
   const groupedNav = {
     "Patient Management": [
       { to: "/register-patient", label: "Register Patient", color: "bg-blue-600" },
@@ -80,13 +85,16 @@ export default function DoctorDashboard() {
       { to: "/request-patient", label: "Request Patient Info", color: "bg-purple-500" },
       { to: "/requests", label: "Requests Made", color: "bg-pink-600" },
       { to: "/question-builder", label: "Questionnaire Builder", color: "bg-gray-700" },
-    ]
+    ],
   };
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800">
-      {/* Header */}
-      <header className="flex justify-between items-center p-4 bg-white shadow-md">
+      {/* Top Navbar */}
+      <DoctorNavbar />
+
+      {/* Inner header with user dropdown */}
+      <header className="flex justify-between items-center p-4 bg-white shadow-sm">
         <h1 className="text-xl font-semibold text-blue-600">Doctor Dashboard</h1>
         <div className="relative" ref={dropdownRef}>
           <button
@@ -100,8 +108,8 @@ export default function DoctorDashboard() {
           </button>
 
           {dropdownOpen && (
-            <div className="absolute right-0 mt-2 w-56 bg-white rounded shadow z-50 overflow-hidden">
-              {navLinks.map((item) => (
+            <div className="absolute right-0 mt-2 w-56 bg-white rounded shadow-lg z-50">
+              {navLinks.map(item => (
                 <Link
                   key={item.to}
                   to={item.to}
@@ -122,18 +130,17 @@ export default function DoctorDashboard() {
         </div>
       </header>
 
-      {/* Main Content */}
+      {/* Main dashboard content */}
       <main className="p-6 max-w-7xl mx-auto space-y-10">
-        {/* Navigation Cards */}
         {Object.entries(groupedNav).map(([section, links]) => (
           <section key={section}>
             <h2 className="text-lg font-semibold mb-4">{section}</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-              {links.map((btn) => (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {links.map(btn => (
                 <Link
                   key={btn.to}
                   to={btn.to}
-                  className={`${btn.color} text-white p-5 rounded-lg text-center text-sm font-semibold hover:opacity-90 transition`}
+                  className={`${btn.color} text-white p-5 rounded-lg text-center font-semibold text-sm hover:opacity-90 transition`}
                 >
                   {btn.label}
                 </Link>
@@ -142,9 +149,8 @@ export default function DoctorDashboard() {
           </section>
         ))}
 
-        {/* Summary Counters */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {["flagged", "booked", "resolved"].map((key) => (
+          {["flagged", "booked", "resolved"].map(key => (
             <div key={key} className="bg-white p-6 rounded-lg shadow text-center">
               <p className="text-sm uppercase text-gray-500">{key}</p>
               <p className="text-4xl font-bold text-blue-700">{counts[key]}</p>
@@ -152,10 +158,9 @@ export default function DoctorDashboard() {
           ))}
         </section>
 
-        {/* Flag Trend Chart */}
         <section className="bg-white p-6 rounded-lg shadow">
           <h2 className="text-lg font-semibold mb-4 text-gray-800">📊 Flagged Cases Over Time</h2>
-          <Suspense fallback={<div className="h-48 flex justify-center items-center text-gray-500">Loading chart...</div>}>
+          <Suspense fallback={<div className="h-48 flex justify-center items-center text-gray-500">Loading chart…</div>}>
             <LineChartStats data={trendData} loading={isLoading} />
           </Suspense>
         </section>
