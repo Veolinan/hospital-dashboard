@@ -61,7 +61,7 @@ export default function LandingPage() {
           </div>
           <div>
             <img
-              src="https://images.unsplash.com/photo-1603386329225-868f9fbf7af1?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+              src="https://images.unsplash.com/photo-1599045118108-bf9954418b76?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTl8fGhvc3BpdGFsfGVufDB8fDB8fHww"
               alt="Medical Triage"
               className="rounded shadow-md"
             />

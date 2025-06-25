@@ -25,6 +25,7 @@ import DormantPatients from "./pages/DormantPatients";
 import PatientReports from "./pages/PatientReports";
 import RequestPatient from "./pages/RequestPatient";
 import Requests from "./pages/Requests";
+import PatientHistory from "./pages/patientHistory";
 
 // 🏥 Hospital Admin Pages
 import HospitalAdminDashboard from "./pages/HospitalAdminDashboard";
@@ -62,12 +63,15 @@ function App() {
         {/* 🩺 Doctor Pages */}
         <Route path="/doctor-dashboard" element={<DoctorDashboard />} />
         <Route path="/all-patients" element={<AllPatients />} />
+        <Route path="/all-patients:patientId" element={<AllPatients />} />
         <Route path="/flagged-patients" element={<FlaggedPatients />} />
         <Route path="/dormant-patients" element={<DormantPatients />} />
         <Route path="/patient-reports" element={<PatientReports />} />
         <Route path="/request-patient" element={<RequestPatient />} />
         <Route path="/requests" element={<Requests />} />
         <Route path="/question-preview" element={<PreviewQuestion />} />
+        <Route path="/patient-history/:patientId" element={<PatientHistory />} />
+        <Route path="patients/:Id" element={<AllPatients />} />
 
         {/* 🏥 Hospital Admin Pages (Nested Routes) */}
         <Route path="/admin" element={<HospitalAdminDashboard />}>

@@ -1,4 +1,3 @@
-// src/pages/Questionnaire.jsx
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { db, auth } from "../firebase";
@@ -61,12 +60,28 @@ export default function Questionnaire() {
     setFinished(false);
   }, [stage]);
 
+  const flattenArray = (arr) => {
+    return arr.reduce((acc, val) => {
+      if (Array.isArray(val)) {
+        acc.push(...flattenArray(val));
+      } else {
+        acc.push(val);
+      }
+      return acc;
+    }, []);
+  };
+
   const handlePick = (choice) => {
     if (!currentId) return;
     setAnswers((a) => ({ ...a, [currentId]: choice.label }));
-    if (choice.flag && !flags.includes(choice.flag)) {
-      setFlags((prev) => [...prev, choice.flag]);
+
+    if (choice.flag) {
+      setFlags((prev) => {
+        const flat = flattenArray([...prev, choice.flag]);
+        return Array.from(new Set(flat)); // remove duplicates
+      });
     }
+
     const nextId = choice.leadsTo && loadedQuestions[choice.leadsTo]
       ? choice.leadsTo
       : null;
@@ -88,9 +103,43 @@ export default function Questionnaire() {
       .sort((a, b) => b.score - a.score);
   };
 
+  const validateBeforeSubmit = ({ answers, flags, confidenceList }) => {
+    const isFlatArray = (arr) => Array.isArray(arr) && !arr.some(Array.isArray);
+    const isValidConfidenceList = Array.isArray(confidenceList) &&
+      confidenceList.every(
+        (c) => typeof c.condition === "string" && typeof c.score === "number"
+      );
+
+    if (typeof answers !== "object" || Array.isArray(answers)) {
+      return "Answers must be a flat object.";
+    }
+
+    if (!isFlatArray(flags)) {
+      return "Flags must be a flat array.";
+    }
+
+    if (!isValidConfidenceList) {
+      return "Confidence list must be an array of {condition, score}.";
+    }
+
+    return null;
+  };
+
   const submit = async () => {
+    const flattenedFlags = flattenArray(flags);
     const confList = calculateConfidence();
     const suggested = confList[0]?.condition || "None";
+
+    const validationError = validateBeforeSubmit({
+      answers,
+      flags: flattenedFlags,
+      confidenceList: confList,
+    });
+
+    if (validationError) {
+      alert(`❌ Invalid submission: ${validationError}`);
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -99,12 +148,13 @@ export default function Questionnaire() {
         patientName: patient.fullName,
         stage,
         answers,
-        flags,
+        flags: flattenedFlags,
         confidenceList: confList,
         suggestedCondition: suggested,
-        status: "submitted",       // ✅ Set initial status
+        status: "submitted",
         submittedAt: serverTimestamp(),
       });
+
       await auth.signOut();
       navigate("/");
     } catch (err) {
@@ -195,6 +245,21 @@ export default function Questionnaire() {
   }
 
   const current = loadedQuestions[currentId];
+
+  if (!current) {
+    return (
+      <div className="p-6 text-center text-red-600">
+        Error: Invalid or missing question. Please restart.
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-4 px-4 py-2 bg-gray-200 rounded"
+        >
+          Reload
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 max-w-md mx-auto">
       <p className="text-gray-500 mb-1">
