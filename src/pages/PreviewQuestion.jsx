@@ -7,13 +7,13 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 export default function PreviewQuestionnaire() {
+  const [errors, setErrors] = useState({});
   const [nodes, setNodes] = useState(null);
   const [paths, setPaths] = useState([]);
   const [questions, setQuestions] = useState([]);
   const [viewMode, setViewMode] = useState('graph');
   const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
-
 
   useEffect(() => {
     const fetch = async () => {
