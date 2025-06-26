@@ -25,41 +25,47 @@ export default function Questionnaire() {
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(null);
 
+  // Redirect if no patient info
   useEffect(() => {
     if (!patient) navigate("/login");
   }, [patient, navigate]);
 
-  const loadQuestions = async () => {
-    if (!stage?.type || !stage?.range) return;
-    setLoading(true);
-    try {
-      const snaps = await getDocs(
-        query(
-          collection(db, "questionnaires"),
-          where("stageType", "==", stage.type),
-          where("stageRange", "==", stage.range)
-        )
-      );
-      const arr = snaps.docs.map((d) => ({ id: d.id, ...d.data() }));
-      const map = Object.fromEntries(arr.map((q) => [q.id, q]));
-      setLoadedQuestions(map);
-      const root = arr.find((q) => q.isRoot);
-      setCurrentId(root?.id ?? null);
-    } catch (e) {
-      console.error(e);
-      setLoadError("Failed to load questions.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Load questions when stage changes
   useEffect(() => {
-    if (stage) loadQuestions();
-    setAnswers({});
-    setFlags([]);
-    setFinished(false);
+    const load = async () => {
+      if (!stage?.type || !stage?.range) return;
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const snaps = await getDocs(
+          query(
+            collection(db, "questionnaires"),
+            where("stageType", "==", stage.type),
+            where("stageRange", "==", stage.range)
+          )
+        );
+        const arr = snaps.docs.map((d) => ({ id: d.id, ...d.data() }));
+        const map = Object.fromEntries(arr.map((q) => [q.id, q]));
+        setLoadedQuestions(map);
+        const root = arr.find((q) => q.isRoot);
+        setCurrentId(root?.id ?? null);
+      } catch (e) {
+        console.error(e);
+        setLoadError("Failed to load questions.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (stage) {
+      setAnswers({});
+      setFlags([]);
+      setFinished(false);
+      load();
+    }
   }, [stage]);
 
+  // Utility to flatten nested arrays (for flags)
   const flattenArray = (arr) => {
     return arr.reduce((acc, val) => {
       if (Array.isArray(val)) {
@@ -71,6 +77,7 @@ export default function Questionnaire() {
     }, []);
   };
 
+  // Handle choice selection
   const handlePick = (choice) => {
     if (!currentId) return;
     setAnswers((a) => ({ ...a, [currentId]: choice.label }));
@@ -82,12 +89,14 @@ export default function Questionnaire() {
       });
     }
 
-    const nextId = choice.leadsTo && loadedQuestions[choice.leadsTo]
-      ? choice.leadsTo
-      : null;
+    const nextId =
+      choice.leadsTo && loadedQuestions[choice.leadsTo]
+        ? choice.leadsTo
+        : null;
     nextId ? setCurrentId(nextId) : setFinished(true);
   };
 
+  // Calculate confidence scores from flags
   const calculateConfidence = () => {
     const total = flags.length;
     if (total === 0) return [];
@@ -96,16 +105,18 @@ export default function Questionnaire() {
       return acc;
     }, {});
     return Object.entries(counts)
-      .map(([cond, count]) => ({
-        condition: cond,
+      .map(([condition, count]) => ({
+        condition,
         score: Math.round((count / total) * 100),
       }))
       .sort((a, b) => b.score - a.score);
   };
 
+  // Validate data before submitting
   const validateBeforeSubmit = ({ answers, flags, confidenceList }) => {
     const isFlatArray = (arr) => Array.isArray(arr) && !arr.some(Array.isArray);
-    const isValidConfidenceList = Array.isArray(confidenceList) &&
+    const isValidConfidenceList =
+      Array.isArray(confidenceList) &&
       confidenceList.every(
         (c) => typeof c.condition === "string" && typeof c.score === "number"
       );
@@ -125,6 +136,7 @@ export default function Questionnaire() {
     return null;
   };
 
+  // Submit questionnaire response
   const submit = async () => {
     const flattenedFlags = flattenArray(flags);
     const confList = calculateConfidence();
@@ -164,6 +176,7 @@ export default function Questionnaire() {
     }
   };
 
+  // Render UI for initial stage selection
   if (!stage) {
     return (
       <div className="p-6 max-w-md mx-auto">
@@ -171,12 +184,14 @@ export default function Questionnaire() {
         <button
           onClick={() => setStage({ type: "pregnant" })}
           className="mb-2 w-full bg-green-100 p-2 rounded"
+          disabled={loading || submitting}
         >
           🤰 Pregnant
         </button>
         <button
           onClick={() => setStage({ type: "postpartum" })}
           className="w-full bg-blue-100 p-2 rounded"
+          disabled={loading || submitting}
         >
           🍼 Postpartum
         </button>
@@ -184,6 +199,7 @@ export default function Questionnaire() {
     );
   }
 
+  // Render UI for selecting range within the stage type
   if (stage.type && !stage.range) {
     const ranges =
       stage.type === "pregnant"
@@ -197,6 +213,7 @@ export default function Questionnaire() {
             key={r}
             onClick={() => setStage({ ...stage, range: r })}
             className="mb-2 w-full bg-gray-100 p-2 rounded"
+            disabled={loading || submitting}
           >
             {r}
           </button>
@@ -205,17 +222,20 @@ export default function Questionnaire() {
     );
   }
 
+  // Loading state
   if (loading) {
     return <p className="p-6 text-center">⏳ Loading questions...</p>;
   }
 
+  // Load error state
   if (loadError) {
     return (
       <div className="p-6 max-w-md mx-auto text-red-600">
         <p>{loadError}</p>
         <button
-          onClick={loadQuestions}
+          onClick={() => window.location.reload()}
           className="mt-4 px-4 py-2 bg-gray-200 rounded"
+          disabled={loading || submitting}
         >
           Retry
         </button>
@@ -223,19 +243,15 @@ export default function Questionnaire() {
     );
   }
 
+  // Finished state
   if (finished) {
-    const confList = calculateConfidence();
     return (
       <div className="p-6 max-w-md mx-auto text-center">
-        <h2 className="text-xl font-semibold text-green-600 mb-4">
-          ✅ Thank you!
-        </h2>
-        <p className="text-gray-600 mb-4">
-          Your responses have been recorded.
-        </p>
+        <h2 className="text-xl font-semibold text-green-600 mb-4">✅ Thank you!</h2>
+        <p className="text-gray-600 mb-4">Your responses have been recorded.</p>
         <button
           onClick={submit}
-          disabled={submitting}
+          disabled={submitting || loading}
           className="w-full bg-green-600 text-white p-2 rounded"
         >
           {submitting ? "Submitting..." : "Finish & Logout"}
@@ -244,8 +260,10 @@ export default function Questionnaire() {
     );
   }
 
+  // Current question object
   const current = loadedQuestions[currentId];
 
+  // If current question missing
   if (!current) {
     return (
       <div className="p-6 text-center text-red-600">
@@ -253,6 +271,7 @@ export default function Questionnaire() {
         <button
           onClick={() => window.location.reload()}
           className="mt-4 px-4 py-2 bg-gray-200 rounded"
+          disabled={loading || submitting}
         >
           Reload
         </button>
@@ -260,6 +279,7 @@ export default function Questionnaire() {
     );
   }
 
+  // Main question display
   return (
     <div className="p-6 max-w-md mx-auto">
       <p className="text-gray-500 mb-1">
@@ -267,11 +287,12 @@ export default function Questionnaire() {
       </p>
       <h2 className="mb-4 text-lg font-semibold">{current.text}</h2>
       <div className="space-y-2">
-        {current.choices.map((choice) => (
+        {current.choices.map((choice, idx) => (
           <button
-            key={choice.label}
+            key={`${choice.label}-${idx}`}
             onClick={() => handlePick(choice)}
             className="block w-full bg-sky-100 p-2 rounded hover:bg-sky-200 transition"
+            disabled={submitting || loading}
           >
             {choice.label}
           </button>

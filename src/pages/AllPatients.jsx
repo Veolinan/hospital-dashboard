@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { db, auth } from "../firebase";
 import {
   collection,
@@ -39,6 +39,43 @@ export default function AllPatients() {
     fetchHospitalId();
   }, []);
 
+  // 🔁 Load patients (memoized to prevent re-renders in useEffect)
+  const loadPatients = useCallback(
+    async (reset = false) => {
+      setLoading(true);
+      try {
+        const q = query(
+          collection(db, "patients"),
+          where("hospitalId", "==", hospitalId),
+          orderBy("fullName"),
+          ...(lastDoc && !reset ? [startAfter(lastDoc)] : []),
+          limit(PAGE_SIZE)
+        );
+
+        const snap = await getDocs(q);
+        const docs = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+
+        const filtered = docs.filter((p) => {
+          const term = search.toLowerCase();
+          return (
+            p.fullName?.toLowerCase().includes(term) ||
+            p.phone?.includes(term) ||
+            p.patientCode?.includes(term)
+          );
+        });
+
+        setPatients((prev) => (reset ? filtered : [...prev, ...filtered]));
+        setLastDoc(snap.docs[snap.docs.length - 1]);
+        setHasMore(snap.docs.length === PAGE_SIZE);
+      } catch (error) {
+        console.error("Error loading patients:", error.message);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [hospitalId, lastDoc, search]
+  );
+
   // 2. Load patients when hospitalId or search changes
   useEffect(() => {
     if (!hospitalId) return;
@@ -46,11 +83,13 @@ export default function AllPatients() {
     setLastDoc(null);
     setHasMore(true);
     loadPatients(true);
-    // eslint-disable-next-line
-  }, [hospitalId, search]);
+  }, [hospitalId, search, loadPatients]);
 
   // 3. Scroll trigger
   useEffect(() => {
+    const currentLoader = loaderRef.current;
+    if (!currentLoader) return;
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && hasMore && !loading) {
@@ -59,43 +98,10 @@ export default function AllPatients() {
       },
       { threshold: 1 }
     );
-    if (loaderRef.current) observer.observe(loaderRef.current);
-    return () => loaderRef.current && observer.unobserve(loaderRef.current);
-  }, [hasMore, loading]);
 
-  // 🔁 Load patients
-  const loadPatients = async (reset = false) => {
-    setLoading(true);
-    try {
-      const q = query(
-        collection(db, "patients"),
-        where("hospitalId", "==", hospitalId),
-        orderBy("fullName"),
-        ...(lastDoc && !reset ? [startAfter(lastDoc)] : []),
-        limit(PAGE_SIZE)
-      );
-
-      const snap = await getDocs(q);
-      const docs = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-
-      const filtered = docs.filter((p) => {
-        const term = search.toLowerCase();
-        return (
-          p.fullName?.toLowerCase().includes(term) ||
-          p.phone?.includes(term) ||
-          p.patientCode?.includes(term)
-        );
-      });
-
-      setPatients((prev) => (reset ? filtered : [...prev, ...filtered]));
-      setLastDoc(snap.docs[snap.docs.length - 1]);
-      setHasMore(snap.docs.length === PAGE_SIZE);
-    } catch (error) {
-      console.error("Error loading patients:", error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+    observer.observe(currentLoader);
+    return () => observer.unobserve(currentLoader);
+  }, [hasMore, loading, loadPatients]);
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-4">

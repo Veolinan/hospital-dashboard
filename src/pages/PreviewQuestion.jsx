@@ -11,9 +11,9 @@ export default function PreviewQuestionnaire() {
   const [paths, setPaths] = useState([]);
   const [questions, setQuestions] = useState([]);
   const [viewMode, setViewMode] = useState('graph');
-  const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
+
 
   useEffect(() => {
     const fetch = async () => {
