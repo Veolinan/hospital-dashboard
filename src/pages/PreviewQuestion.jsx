@@ -7,12 +7,12 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 export default function PreviewQuestionnaire() {
-  const [errors, setErrors] = useState({});
   const [nodes, setNodes] = useState(null);
   const [paths, setPaths] = useState([]);
   const [questions, setQuestions] = useState([]);
   const [viewMode, setViewMode] = useState('graph');
   const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState({}); // <-- Added here
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -131,8 +131,18 @@ export default function PreviewQuestionnaire() {
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold">Questionnaire Preview</h2>
           <div className="space-x-2">
-            <button onClick={() => setViewMode('graph')} className={`px-4 py-2 rounded ${viewMode === 'graph' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>Graph</button>
-            <button onClick={() => setViewMode('table')} className={`px-4 py-2 rounded ${viewMode === 'table' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>Table</button>
+            <button
+              onClick={() => setViewMode('graph')}
+              className={`px-4 py-2 rounded ${viewMode === 'graph' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+            >
+              Graph
+            </button>
+            <button
+              onClick={() => setViewMode('table')}
+              className={`px-4 py-2 rounded ${viewMode === 'table' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+            >
+              Table
+            </button>
           </div>
         </div>
 
@@ -141,13 +151,17 @@ export default function PreviewQuestionnaire() {
           <div className="h-[28rem] border bg-white shadow-md overflow-auto">
             {nodes ? (
               <Tree data={nodes} orientation="vertical" translate={{ x: 400, y: 50 }} collapsible={false} />
-            ) : <p>Loading map...</p>}
+            ) : (
+              <p>Loading map...</p>
+            )}
             {paths.length > 0 && (
               <div className="mt-4">
                 <h3 className="text-lg font-semibold mb-2">Decision Paths</h3>
                 {paths.map((p, i) => (
                   <div key={i} className="mb-2 p-3 bg-gray-100 rounded">
-                    <p><strong>Path {i + 1}:</strong> {p.join(' → ')}</p>
+                    <p>
+                      <strong>Path {i + 1}:</strong> {p.join(' → ')}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -160,11 +174,19 @@ export default function PreviewQuestionnaire() {
           <div className="bg-white p-4 shadow rounded space-y-4">
             {questions.map((q, qi) => {
               const isEditing = q.editing;
+              const questionError = errors[`q-${qi}`];
               return (
-                <div key={qi} className="border rounded-lg p-4 shadow-sm bg-gray-50">
+                <div
+                  key={qi}
+                  className={`border rounded-lg p-4 shadow-sm bg-gray-50 ${
+                    questionError ? 'border-red-500 bg-red-50' : ''
+                  }`}
+                >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-4">
-                      <p className="text-sm text-gray-600">Order: <span className="font-medium">{q.order}</span></p>
+                      <p className="text-sm text-gray-600">
+                        Order: <span className="font-medium">{q.order}</span>
+                      </p>
                       <label className="flex items-center gap-2 text-sm">
                         <input
                           type="checkbox"
@@ -181,34 +203,56 @@ export default function PreviewQuestionnaire() {
                     </div>
                     <div className="space-x-2">
                       {!isEditing ? (
-                        <button onClick={() => {
-                          const updated = questions.map((item, idx) =>
-                            idx === qi ? { ...item, editing: true } : item
-                          );
-                          setQuestions(updated);
-                        }} className="text-blue-600 text-sm hover:underline">✏️ Edit</button>
+                        <button
+                          onClick={() => {
+                            const updated = questions.map((item, idx) =>
+                              idx === qi ? { ...item, editing: true } : item
+                            );
+                            setQuestions(updated);
+                          }}
+                          className="text-blue-600 text-sm hover:underline"
+                        >
+                          ✏️ Edit
+                        </button>
                       ) : (
                         <>
-                          <button onClick={() => {
-                            const updated = [...questions];
-                            updated[qi].editing = false;
-                            setQuestions(updated);
-                          }} className="text-gray-600 text-sm hover:underline">Cancel</button>
-                          <button onClick={() => {
-                            const updated = [...questions];
-                            updated[qi].editing = false;
-                            setQuestions(updated);
-                          }} className="text-green-600 text-sm hover:underline">Save</button>
+                          <button
+                            onClick={() => {
+                              const updated = [...questions];
+                              updated[qi].editing = false;
+                              setQuestions(updated);
+                            }}
+                            className="text-gray-600 text-sm hover:underline"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={() => {
+                              const updated = [...questions];
+                              updated[qi].editing = false;
+                              setQuestions(updated);
+                            }}
+                            className="text-green-600 text-sm hover:underline"
+                          >
+                            Save
+                          </button>
                         </>
                       )}
-                      <button onClick={() => deleteQuestion(qi)} className="text-red-600 text-sm hover:underline">🗑 Delete</button>
+                      <button
+                        onClick={() => deleteQuestion(qi)}
+                        className="text-red-600 text-sm hover:underline"
+                      >
+                        🗑 Delete
+                      </button>
                     </div>
                   </div>
 
                   <div className="mb-2">
                     {isEditing ? (
                       <textarea
-                        className="w-full border rounded-md p-2 text-sm resize-y"
+                        className={`w-full border rounded-md p-2 text-sm resize-y ${
+                          questionError ? 'border-red-500 bg-red-50' : ''
+                        }`}
                         rows={2}
                         value={q.text}
                         onChange={(e) => {
@@ -224,39 +268,73 @@ export default function PreviewQuestionnaire() {
 
                   <div>
                     <h4 className="text-sm text-gray-500 mb-1">Choices:</h4>
-                    {q.choices.map((c, ci) => (
-                      <div key={ci} className="flex flex-wrap gap-2 items-center mb-2">
-                        {isEditing ? (
-                          <>
-                            <input value={c.label} onChange={(e) => {
-                              const qs = [...questions];
-                              qs[qi].choices[ci].label = e.target.value;
-                              setQuestions(qs);
-                            }} className="border p-1 rounded text-sm w-32" placeholder="Label" />
+                    {q.choices.map((c, ci) => {
+                      const choiceError = errors[`q-${qi}-c-${ci}`];
+                      return (
+                        <div
+                          key={ci}
+                          className={`flex flex-wrap gap-2 items-center mb-2 ${
+                            choiceError ? 'border border-red-500 bg-red-50 rounded px-2 py-1' : ''
+                          }`}
+                        >
+                          {isEditing ? (
+                            <>
+                              <input
+                                value={c.label}
+                                onChange={(e) => {
+                                  const qs = [...questions];
+                                  qs[qi].choices[ci].label = e.target.value;
+                                  setQuestions(qs);
+                                }}
+                                className={`border p-1 rounded text-sm w-32 ${
+                                  choiceError ? 'border-red-500' : ''
+                                }`}
+                                placeholder="Label"
+                              />
 
-                            <input type="number" value={c.leadsTo} onChange={(e) => {
-                              const qs = [...questions];
-                              qs[qi].choices[ci].leadsTo = parseInt(e.target.value) || '';
-                              setQuestions(qs);
-                            }} className="border p-1 rounded text-sm w-20" placeholder="LeadsTo" />
+                              <input
+                                type="number"
+                                value={c.leadsTo}
+                                onChange={(e) => {
+                                  const qs = [...questions];
+                                  qs[qi].choices[ci].leadsTo = parseInt(e.target.value) || '';
+                                  setQuestions(qs);
+                                }}
+                                className="border p-1 rounded text-sm w-20"
+                                placeholder="LeadsTo"
+                              />
 
-                            <input value={c.flag} onChange={(e) => {
-                              const qs = [...questions];
-                              qs[qi].choices[ci].flag = e.target.value;
-                              setQuestions(qs);
-                            }} className="border p-1 rounded text-sm w-24" placeholder="Flag" />
+                              <input
+                                value={c.flag}
+                                onChange={(e) => {
+                                  const qs = [...questions];
+                                  qs[qi].choices[ci].flag = e.target.value;
+                                  setQuestions(qs);
+                                }}
+                                className="border p-1 rounded text-sm w-24"
+                                placeholder="Flag"
+                              />
 
-                            <button onClick={() => removeChoice(qi, ci)} className="text-red-500 text-sm hover:underline">❌</button>
-                          </>
-                        ) : (
-                          <span className="text-sm bg-gray-100 px-2 py-1 rounded">
-                            {c.label} → {c.leadsTo || 'End'} {c.flag ? `(Flag: ${c.flag})` : ''}
-                          </span>
-                        )}
-                      </div>
-                    ))}
+                              <button
+                                onClick={() => removeChoice(qi, ci)}
+                                className="text-red-500 text-sm hover:underline"
+                              >
+                                ❌
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-sm bg-gray-100 px-2 py-1 rounded">
+                              {c.label} → {c.leadsTo || 'End'} {c.flag ? `(Flag: ${c.flag})` : ''}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
                     {isEditing && (
-                      <button onClick={() => addChoice(qi)} className="text-sm text-blue-600 hover:underline mt-1">
+                      <button
+                        onClick={() => addChoice(qi)}
+                        className="text-sm text-blue-600 hover:underline mt-1"
+                      >
                         + Add Choice
                       </button>
                     )}
@@ -266,8 +344,18 @@ export default function PreviewQuestionnaire() {
             })}
 
             <div className="mt-6 flex justify-between">
-              <button onClick={onSaveTable} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition">💾 Save All Changes</button>
-              <button onClick={() => navigate('/question-builder')} className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 transition">← Back to Builder</button>
+              <button
+                onClick={onSaveTable}
+                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition"
+              >
+                💾 Save All Changes
+              </button>
+              <button
+                onClick={() => navigate('/question-builder')}
+                className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 transition"
+              >
+                ← Back to Builder
+              </button>
             </div>
           </div>
         )}
