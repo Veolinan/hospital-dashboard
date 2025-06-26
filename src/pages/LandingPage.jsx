@@ -36,7 +36,7 @@ export default function LandingPage() {
           <span className="font-semibold">Kakuma Innovation Mission in May 2025</span>,
           a collaboration between the{" "}
           <span className="font-semibold">Kenya Red Cross Society</span> and the{" "}
-          <span className="font-semibold">University of Texas</span>. It aims to streamline
+          <span className="font-semibold">Kalobeyei Healthcentre</span>. It aims to streamline
           healthcare delivery in resource-constrained environments like Kakuma and Kalobeyei,
           where doctor-to-patient ratios are high, and expectant mothers often lack access
           to smartphones, transport, or emergency care.
@@ -88,7 +88,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="text-center py-6 text-sm text-gray-500 bg-white border-t">
-        © {new Date().getFullYear()} Danstarn HealthFlag • Built with ❤️ in IOMe 001 Mombasa • Powered by KRCS & UT
+        © {new Date().getFullYear()} Danstarn HealthFlag • Built with ❤️ in IOMe 001 Mombasa • Powered by KRCS & ICHA
       </footer>
 
       {/* Role Selection Modal */}
