@@ -60,7 +60,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 to-white">
       <div className="bg-white p-8 rounded shadow-md w-full max-w-md">
-        <h2 className="text-2xl font-bold mb-4 text-blue-600 text-center">HealthFlag Login</h2>
+        <h2 className="text-2xl font-bold mb-4 text-blue-600 text-center">Danstarn HealthFlag Login</h2>
         <form onSubmit={handleLogin} className="space-y-4">
           {error && <p className="text-red-500 text-sm">{error}</p>}
           <input

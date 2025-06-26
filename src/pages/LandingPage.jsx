@@ -16,7 +16,7 @@ export default function LandingPage() {
       {/* Header */}
       <header className="bg-white shadow sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-blue-600">HealthFlag</h1>
+          <h1 className="text-2xl font-bold text-blue-600">Danstarn HealthFlag</h1>
           <button
             onClick={() => setShowRoleModal(true)}
             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
@@ -32,7 +32,7 @@ export default function LandingPage() {
           Empowering Early Detection & Maternal Triage
         </h2>
         <p className="max-w-3xl mx-auto text-lg text-gray-600">
-          HealthFlag is a digital triage and alert system developed during the{" "}
+          Danstarn HealthFlag is a digital triage and alert system developed during the{" "}
           <span className="font-semibold">Kakuma Innovation Mission in May 2025</span>,
           a collaboration between the{" "}
           <span className="font-semibold">Kenya Red Cross Society</span> and the{" "}
@@ -48,7 +48,7 @@ export default function LandingPage() {
           <div>
             <h3 className="text-2xl font-bold mb-4 text-blue-700">How It Works</h3>
             <p className="text-gray-700 mb-4">
-              HealthFlag offers rapid digital triage through a simple questionnaire filled out by healthcare workers or patients. The system evaluates responses using medical flag logic to assess <strong>symptom severity</strong>, <strong>maternal risk</strong>, and <strong>age vulnerability</strong>. 
+              Danstarn HealthFlag offers rapid digital triage through a simple questionnaire filled out by healthcare workers or patients. The system evaluates responses using medical flag logic to assess <strong>symptom severity</strong>, <strong>maternal risk</strong>, and <strong>age vulnerability</strong>. 
               Key benefits include:
             </p>
             <ul className="list-disc pl-6 space-y-2 text-gray-700">
@@ -76,7 +76,7 @@ export default function LandingPage() {
       <section className="py-20 text-center bg-blue-600 text-white px-6">
         <h3 className="text-3xl font-bold mb-4">Ready to begin?</h3>
         <p className="mb-6 text-lg">
-          Login to access the HealthFlag dashboard and begin supporting early maternal triage in your clinic or community.
+          Login to access the Danstarn HealthFlag dashboard and begin supporting early maternal triage in your clinic or community.
         </p>
         <button
           onClick={() => setShowRoleModal(true)}
@@ -88,7 +88,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="text-center py-6 text-sm text-gray-500 bg-white border-t">
-        © {new Date().getFullYear()} HealthFlag • Built with ❤️ in IOMe 001 Mombasa • Powered by KRCS & UT
+        © {new Date().getFullYear()} Danstarn HealthFlag • Built with ❤️ in IOMe 001 Mombasa • Powered by KRCS & UT
       </footer>
 
       {/* Role Selection Modal */}
