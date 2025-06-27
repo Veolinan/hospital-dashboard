@@ -1,47 +1,43 @@
 import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
+import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "../firebase";
 import { doc, getDoc } from "firebase/firestore";
 
 const ProtectedRoute = ({ allowedRoles = [], children }) => {
-  const [loading, setLoading] = useState(true);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [hasAccess, setHasAccess] = useState(false);
-  const [userChecked, setUserChecked] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
-    const checkAccess = async () => {
-      const user = auth.currentUser;
-
-      // Redirect if not logged in
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        setUserChecked(true);
-        setLoading(false);
+        setIsLoggedIn(false);
+        setCheckingAuth(false);
         return;
       }
 
+      setIsLoggedIn(true);
+
       try {
-        const docRef = doc(db, "users", user.uid);
-        const docSnap = await getDoc(docRef);
+        const userRef = doc(db, "users", user.uid);
+        const snap = await getDoc(userRef);
 
-        if (docSnap.exists()) {
-          const role = docSnap.data().role;
-
-          if (allowedRoles.includes(role)) {
-            setHasAccess(true);
-          }
+        if (snap.exists()) {
+          const role = snap.data().role;
+          setHasAccess(allowedRoles.includes(role));
         }
       } catch (err) {
-        console.error("Error checking user role:", err);
+        console.error("Error checking role:", err);
       }
 
-      setUserChecked(true);
-      setLoading(false);
-    };
+      setCheckingAuth(false);
+    });
 
-    checkAccess();
+    return () => unsubscribe();
   }, [allowedRoles]);
 
-  if (loading) {
+  if (checkingAuth) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-blue-500 border-solid" />
@@ -49,12 +45,12 @@ const ProtectedRoute = ({ allowedRoles = [], children }) => {
     );
   }
 
-  // 🚫 Not logged in
-  if (!auth.currentUser && userChecked) {
+  // ❗ Not logged in
+  if (!isLoggedIn) {
     return <Navigate to="/login" replace />;
   }
 
-  // ❌ Not authorized
+  // ❌ Unauthorized
   if (!hasAccess) {
     return <Navigate to="/not-allowed" replace />;
   }
