@@ -12,7 +12,7 @@ export default function PreviewQuestionnaire() {
   const [questions, setQuestions] = useState([]);
   const [viewMode, setViewMode] = useState('graph');
   const [saving, setSaving] = useState(false);
-  const [errors, setErrors] = useState({}); // <-- Added here
+  const [errors, setErrors] = useState({});
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -36,7 +36,7 @@ export default function PreviewQuestionnaire() {
         return {
           name: c.label,
           children: next ? [makeNode(next)] : [],
-          attributes: { flag: c.flag || '' }
+          attributes: { flag: c.flag || '', weight: c.weight, classification: c.classification }
         };
       }),
     });
@@ -89,7 +89,7 @@ export default function PreviewQuestionnaire() {
 
   const addChoice = (qi) => {
     const qs = [...questions];
-    qs[qi].choices.push({ label: '', leadsTo: '', flag: '' });
+    qs[qi].choices.push({ label: '', leadsTo: '', flag: '', weight: 0, classification: '' });
     setQuestions(qs);
   };
 
@@ -116,7 +116,6 @@ export default function PreviewQuestionnaire() {
 
   return (
     <div className="relative">
-      {/* Saving Overlay */}
       {saving && (
         <>
           <div className="fixed inset-0 bg-white bg-opacity-30 backdrop-blur-sm z-50" />
@@ -146,7 +145,6 @@ export default function PreviewQuestionnaire() {
           </div>
         </div>
 
-        {/* GRAPH MODE */}
         {viewMode === 'graph' && (
           <div className="h-[28rem] border bg-white shadow-md overflow-auto">
             {nodes ? (
@@ -169,7 +167,6 @@ export default function PreviewQuestionnaire() {
           </div>
         )}
 
-        {/* TABLE MODE */}
         {viewMode === 'table' && (
           <div className="bg-white p-4 shadow rounded space-y-4">
             {questions.map((q, qi) => {
@@ -286,12 +283,9 @@ export default function PreviewQuestionnaire() {
                                   qs[qi].choices[ci].label = e.target.value;
                                   setQuestions(qs);
                                 }}
-                                className={`border p-1 rounded text-sm w-32 ${
-                                  choiceError ? 'border-red-500' : ''
-                                }`}
+                                className="border p-1 rounded text-sm w-28"
                                 placeholder="Label"
                               />
-
                               <input
                                 type="number"
                                 value={c.leadsTo}
@@ -303,7 +297,6 @@ export default function PreviewQuestionnaire() {
                                 className="border p-1 rounded text-sm w-20"
                                 placeholder="LeadsTo"
                               />
-
                               <input
                                 value={c.flag}
                                 onChange={(e) => {
@@ -311,10 +304,34 @@ export default function PreviewQuestionnaire() {
                                   qs[qi].choices[ci].flag = e.target.value;
                                   setQuestions(qs);
                                 }}
-                                className="border p-1 rounded text-sm w-24"
+                                className="border p-1 rounded text-sm w-20"
                                 placeholder="Flag"
                               />
-
+                              <input
+                                type="number"
+                                value={c.weight}
+                                onChange={(e) => {
+                                  const qs = [...questions];
+                                  qs[qi].choices[ci].weight = parseFloat(e.target.value) || 0;
+                                  setQuestions(qs);
+                                }}
+                                className="border p-1 rounded text-sm w-16"
+                                placeholder="Weight"
+                              />
+                              <select
+                                value={c.classification || ''}
+                                onChange={(e) => {
+                                  const qs = [...questions];
+                                  qs[qi].choices[ci].classification = e.target.value;
+                                  setQuestions(qs);
+                                }}
+                                className="border p-1 rounded text-sm w-32"
+                              >
+                                <option value="">Classification</option>
+                                <option value="danger">Danger Zone</option>
+                                <option value="alert">Alert Zone</option>
+                                <option value="low">Low Risk</option>
+                              </select>
                               <button
                                 onClick={() => removeChoice(qi, ci)}
                                 className="text-red-500 text-sm hover:underline"
@@ -324,7 +341,7 @@ export default function PreviewQuestionnaire() {
                             </>
                           ) : (
                             <span className="text-sm bg-gray-100 px-2 py-1 rounded">
-                              {c.label} → {c.leadsTo || 'End'} {c.flag ? `(Flag: ${c.flag})` : ''}
+                              {c.label} → {c.leadsTo || 'End'} {c.flag ? `(Flag: ${c.flag})` : ''} {`[W: ${c.weight ?? 0}]`} {c.classification ? `(${c.classification})` : ''}
                             </span>
                           )}
                         </div>

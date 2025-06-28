@@ -1,6 +1,15 @@
 // src/pages/QuestionBuilder.jsx
 import React, { useState, useEffect } from 'react';
-import { addDoc, updateDoc, doc, collection, query, getDocs, orderBy } from 'firebase/firestore';
+import {
+  addDoc,
+  updateDoc,
+  doc,
+  collection,
+  query,
+  getDocs,
+  orderBy,
+  deleteDoc,
+} from 'firebase/firestore';
 import { db } from '../firebase';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -19,14 +28,19 @@ export default function QuestionBuilder() {
   const [category, setCategory] = useState('');
   const [evaluatedCondition, setEvaluatedCondition] = useState('');
   const [questions, setQuestions] = useState([
-    { id: 'q1', order: 1, isRoot: true, text: '', choices: [{ label: '', leadsTo: '', flag: '' }] },
+    {
+      id: 'q1',
+      order: 1,
+      isRoot: true,
+      text: '',
+      choices: [{ label: '', leadsTo: '', flag: '', weight: 0, riskLevel: '' }],
+    },
   ]);
   const [showPaste, setShowPaste] = useState(false);
   const [pastedJSON, setPastedJSON] = useState('');
   const [history, setHistory] = useState([]);
   const [editingId, setEditingId] = useState(null);
 
-  // Load questionnaire if editing
   useEffect(() => {
     if (location.state?.questionnaire) {
       const q = location.state.questionnaire;
@@ -39,16 +53,15 @@ export default function QuestionBuilder() {
     }
   }, [location.state]);
 
-  // Fetch saved questionnaires
   useEffect(() => {
-    const loadHistory = async () => {
-      const snap = await getDocs(query(collection(db, 'questionnaires'), orderBy('timestamp', 'desc')));
-      setHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    };
     loadHistory();
   }, []);
 
-  // Helpers
+  const loadHistory = async () => {
+    const snap = await getDocs(query(collection(db, 'questionnaires'), orderBy('timestamp', 'desc')));
+    setHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  };
+
   const loadFromJSON = obj => {
     if (!obj) return;
     if (Array.isArray(obj.questions)) setQuestions(obj.questions);
@@ -62,13 +75,16 @@ export default function QuestionBuilder() {
 
   const addQuestion = () => {
     const nextId = 'q' + (questions.length + 1);
-    setQuestions(prev => [...prev, {
-      id: nextId,
-      order: prev.length + 1,
-      isRoot: false,
-      text: '',
-      choices: [{ label: '', leadsTo: '', flag: '' }],
-    }]);
+    setQuestions(prev => [
+      ...prev,
+      {
+        id: nextId,
+        order: prev.length + 1,
+        isRoot: false,
+        text: '',
+        choices: [{ label: '', leadsTo: '', flag: '', weight: 0, riskLevel: '' }],
+      },
+    ]);
   };
 
   const updateQuestion = (qi, field, val) => {
@@ -85,7 +101,13 @@ export default function QuestionBuilder() {
 
   const addChoice = qi => {
     const newQuestions = [...questions];
-    newQuestions[qi].choices.push({ label: '', leadsTo: '', flag: '' });
+    newQuestions[qi].choices.push({
+      label: '',
+      leadsTo: '',
+      flag: '',
+      weight: 0,
+      riskLevel: '',
+    });
     setQuestions(newQuestions);
   };
 
@@ -115,7 +137,14 @@ export default function QuestionBuilder() {
 
   const handleSubmit = async () => {
     if (!category || !evaluatedCondition) return alert('Category and Condition required.');
-    const payload = { stageType, stageRange, category, evaluatedCondition, questions, timestamp: Date.now() };
+    const payload = {
+      stageType,
+      stageRange,
+      category,
+      evaluatedCondition,
+      questions,
+      timestamp: Date.now(),
+    };
 
     try {
       if (editingId) {
@@ -130,23 +159,62 @@ export default function QuestionBuilder() {
     }
   };
 
+  const handleDeleteSaved = async id => {
+    const confirm = window.confirm('🗑 Are you sure you want to delete this questionnaire?');
+    if (!confirm) return;
+    try {
+      await deleteDoc(doc(db, 'questionnaires', id));
+      setHistory(prev => prev.filter(q => q.id !== id));
+      alert('✅ Deleted');
+    } catch (err) {
+      alert('❌ Failed to delete: ' + err.message);
+    }
+  };
+
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <h2 className="mb-4 text-2xl font-bold">📋 Questionnaire Builder</h2>
 
-      {/* Header Inputs */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <input placeholder="Category" className="border p-2 rounded" value={category} onChange={e => setCategory(e.target.value)} />
-        <input placeholder="Condition" className="border p-2 rounded" value={evaluatedCondition} onChange={e => setEvaluatedCondition(e.target.value)} />
-        <select value={stageType} onChange={e => { setStageType(e.target.value); setStageRange(RANGES[e.target.value][0]); }} className="border p-2 rounded">
-          {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+        <input
+          placeholder="Category"
+          className="border p-2 rounded"
+          value={category}
+          onChange={e => setCategory(e.target.value)}
+        />
+        <input
+          placeholder="Condition"
+          className="border p-2 rounded"
+          value={evaluatedCondition}
+          onChange={e => setEvaluatedCondition(e.target.value)}
+        />
+        <select
+          value={stageType}
+          onChange={e => {
+            setStageType(e.target.value);
+            setStageRange(RANGES[e.target.value][0]);
+          }}
+          className="border p-2 rounded"
+        >
+          {STAGES.map(s => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
         </select>
-        <select value={stageRange} onChange={e => setStageRange(e.target.value)} className="border p-2 rounded">
-          {RANGES[stageType].map(r => <option key={r} value={r}>{r}</option>)}
+        <select
+          value={stageRange}
+          onChange={e => setStageRange(e.target.value)}
+          className="border p-2 rounded"
+        >
+          {RANGES[stageType].map(r => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
         </select>
       </div>
 
-      {/* JSON Upload/Paste */}
       <div className="flex gap-4 mb-6">
         <label className="p-2 bg-blue-100 rounded cursor-pointer">
           📁 Upload JSON
@@ -159,35 +227,88 @@ export default function QuestionBuilder() {
 
       {showPaste && (
         <div className="mb-6">
-          <textarea className="w-full border p-2 rounded font-mono" rows={5} value={pastedJSON} onChange={e => setPastedJSON(e.target.value)} placeholder="Paste JSON here…" />
-          <button className="mt-2 bg-green-500 text-white px-4 py-2 rounded" onClick={handlePasteJSON}>
+          <textarea
+            className="w-full border p-2 rounded font-mono"
+            rows={5}
+            value={pastedJSON}
+            onChange={e => setPastedJSON(e.target.value)}
+            placeholder="Paste JSON here…"
+          />
+          <button
+            className="mt-2 bg-green-500 text-white px-4 py-2 rounded"
+            onClick={handlePasteJSON}
+          >
             Load from Paste
           </button>
         </div>
       )}
 
-      {/* Questions */}
       {questions.map((q, qi) => (
         <div key={q.id} className="mb-4 p-4 border rounded bg-gray-50">
           <div className="flex items-center gap-4 mb-2">
             <span className="font-bold">[{q.id}] Q{q.order}:</span>
-            <input className="flex-1 border p-1 rounded" placeholder="Question text" value={q.text} onChange={e => updateQuestion(qi, 'text', e.target.value)} />
+            <input
+              className="flex-1 border p-1 rounded"
+              placeholder="Question text"
+              value={q.text}
+              onChange={e => updateQuestion(qi, 'text', e.target.value)}
+            />
             <label className="flex items-center gap-1">
-              Root? <input type="checkbox" checked={q.isRoot} onChange={e => updateQuestion(qi, 'isRoot', e.target.checked)} />
+              Root?{' '}
+              <input
+                type="checkbox"
+                checked={q.isRoot}
+                onChange={e => updateQuestion(qi, 'isRoot', e.target.checked)}
+              />
             </label>
           </div>
           {q.choices.map((c, ci) => (
-            <div key={ci} className="flex gap-2 mb-2">
-              <input className="flex-1 border p-1 rounded" placeholder="Label" value={c.label} onChange={e => updateChoice(qi, ci, 'label', e.target.value)} />
-              <input className="w-24 border p-1 rounded" placeholder="LeadsTo" value={c.leadsTo} onChange={e => updateChoice(qi, ci, 'leadsTo', e.target.value)} />
-              <input className="w-24 border p-1 rounded" placeholder="Flag" value={c.flag} onChange={e => updateChoice(qi, ci, 'flag', e.target.value)} />
+            <div key={ci} className="grid grid-cols-1 md:grid-cols-5 gap-2 mb-2">
+              <input
+                className="border p-1 rounded"
+                placeholder="Label"
+                value={c.label}
+                onChange={e => updateChoice(qi, ci, 'label', e.target.value)}
+              />
+              <input
+                className="border p-1 rounded"
+                placeholder="LeadsTo"
+                value={c.leadsTo}
+                onChange={e => updateChoice(qi, ci, 'leadsTo', e.target.value)}
+              />
+              <input
+                className="border p-1 rounded"
+                placeholder="Flag"
+                value={c.flag}
+                onChange={e => updateChoice(qi, ci, 'flag', e.target.value)}
+              />
+              <input
+                className="border p-1 rounded"
+                type="number"
+                placeholder="Weight"
+                value={c.weight ?? ''}
+                onChange={e =>
+                  updateChoice(qi, ci, 'weight', parseInt(e.target.value) || 0)
+                }
+              />
+              <select
+                className="border p-1 rounded"
+                value={c.riskLevel || ''}
+                onChange={e => updateChoice(qi, ci, 'riskLevel', e.target.value)}
+              >
+                <option value="">Risk</option>
+                <option value="low">Low</option>
+                <option value="alert">Alert</option>
+                <option value="danger">Danger</option>
+              </select>
             </div>
           ))}
-          <button className="text-blue-600" onClick={() => addChoice(qi)}>+ Add Choice</button>
+          <button className="text-blue-600" onClick={() => addChoice(qi)}>
+            + Add Choice
+          </button>
         </div>
       ))}
 
-      {/* Actions */}
       <div className="flex justify-between mt-6 mb-8">
         <button className="bg-gray-200 px-4 py-2 rounded" onClick={addQuestion}>
           ➕ Add Question
@@ -197,7 +318,6 @@ export default function QuestionBuilder() {
         </button>
       </div>
 
-      {/* Moved History Section */}
       {!!history.length && (
         <div className="mt-10">
           <h3 className="mb-2 font-semibold text-lg">📂 Saved Questionnaires</h3>
@@ -206,14 +326,29 @@ export default function QuestionBuilder() {
               const date = new Date(q.timestamp).toLocaleString();
               const name = `${q.stageRange} — ${q.stageType} — ${date}`;
               return (
-                <li key={q.id} className="flex justify-between items-center bg-gray-100 p-2 rounded">
+                <li
+                  key={q.id}
+                  className="flex justify-between items-center bg-gray-100 p-2 rounded"
+                >
                   <span className="font-medium">{name}</span>
                   <div className="space-x-2">
-                    <button className="text-blue-600 hover:underline" onClick={() => navigate('/preview-question', { state: { questionnaire: q } })}>
+                    <button
+                      className="text-blue-600 hover:underline"
+                      onClick={() => navigate('/preview-question', { state: { questionnaire: q } })}
+                    >
                       👁️ Preview
                     </button>
-                    <button className="text-green-600 hover:underline" onClick={() => navigate('/question-builder', { state: { questionnaire: q } })}>
+                    <button
+                      className="text-green-600 hover:underline"
+                      onClick={() => navigate('/question-builder', { state: { questionnaire: q } })}
+                    >
                       🛠 Edit
+                    </button>
+                    <button
+                      className="text-red-600 hover:underline"
+                      onClick={() => handleDeleteSaved(q.id)}
+                    >
+                      🗑 Delete
                     </button>
                   </div>
                 </li>

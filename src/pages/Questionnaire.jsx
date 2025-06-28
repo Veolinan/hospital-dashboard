@@ -1,3 +1,4 @@
+// src/pages/Questionnaire.jsx
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { db, auth } from "../firebase";
@@ -20,17 +21,17 @@ export default function Questionnaire() {
   const [currentId, setCurrentId] = useState(null);
   const [answers, setAnswers] = useState({});
   const [flags, setFlags] = useState([]);
+  const [totalWeight, setTotalWeight] = useState(0);
+  const [riskLevels, setRiskLevels] = useState([]);
   const [finished, setFinished] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(null);
 
-  // Redirect if no patient info
   useEffect(() => {
     if (!patient) navigate("/login");
   }, [patient, navigate]);
 
-  // Load questions when stage changes
   useEffect(() => {
     const load = async () => {
       if (!stage?.type || !stage?.range) return;
@@ -45,9 +46,14 @@ export default function Questionnaire() {
           )
         );
         const arr = snaps.docs.map((d) => ({ id: d.id, ...d.data() }));
-        const map = Object.fromEntries(arr.map((q) => [q.id, q]));
+        const map = {};
+        arr.forEach(q => {
+          q.questions.forEach(qObj => {
+            map[qObj.id] = qObj;
+          });
+        });
         setLoadedQuestions(map);
-        const root = arr.find((q) => q.isRoot);
+        const root = Object.values(map).find(q => q.isRoot);
         setCurrentId(root?.id ?? null);
       } catch (e) {
         console.error(e);
@@ -60,12 +66,13 @@ export default function Questionnaire() {
     if (stage) {
       setAnswers({});
       setFlags([]);
+      setRiskLevels([]);
+      setTotalWeight(0);
       setFinished(false);
       load();
     }
   }, [stage]);
 
-  // Utility to flatten nested arrays (for flags)
   const flattenArray = (arr) => {
     return arr.reduce((acc, val) => {
       if (Array.isArray(val)) {
@@ -77,7 +84,6 @@ export default function Questionnaire() {
     }, []);
   };
 
-  // Handle choice selection
   const handlePick = (choice) => {
     if (!currentId) return;
     setAnswers((a) => ({ ...a, [currentId]: choice.label }));
@@ -85,8 +91,16 @@ export default function Questionnaire() {
     if (choice.flag) {
       setFlags((prev) => {
         const flat = flattenArray([...prev, choice.flag]);
-        return Array.from(new Set(flat)); // remove duplicates
+        return Array.from(new Set(flat));
       });
+    }
+
+    if (choice.weight) {
+      setTotalWeight(prev => prev + parseInt(choice.weight));
+    }
+
+    if (choice.riskLevel) {
+      setRiskLevels(prev => [...prev, choice.riskLevel]);
     }
 
     const nextId =
@@ -96,7 +110,6 @@ export default function Questionnaire() {
     nextId ? setCurrentId(nextId) : setFinished(true);
   };
 
-  // Calculate confidence scores from flags
   const calculateConfidence = () => {
     const total = flags.length;
     if (total === 0) return [];
@@ -112,7 +125,16 @@ export default function Questionnaire() {
       .sort((a, b) => b.score - a.score);
   };
 
-  // Validate data before submitting
+  const classifyRisk = () => {
+    const count = { low: 0, alert: 0, danger: 0 };
+    for (const level of riskLevels) {
+      count[level] = (count[level] || 0) + 1;
+    }
+    if (count.danger > 0) return "Danger Zone";
+    if (count.alert > 0) return "Alert Zone";
+    return "Low Risk";
+  };
+
   const validateBeforeSubmit = ({ answers, flags, confidenceList }) => {
     const isFlatArray = (arr) => Array.isArray(arr) && !arr.some(Array.isArray);
     const isValidConfidenceList =
@@ -136,7 +158,6 @@ export default function Questionnaire() {
     return null;
   };
 
-  // Submit questionnaire response
   const submit = async () => {
     const flattenedFlags = flattenArray(flags);
     const confList = calculateConfidence();
@@ -163,6 +184,8 @@ export default function Questionnaire() {
         flags: flattenedFlags,
         confidenceList: confList,
         suggestedCondition: suggested,
+        totalWeight,
+        riskClassification: classifyRisk(),
         status: "submitted",
         submittedAt: serverTimestamp(),
       });
@@ -176,7 +199,6 @@ export default function Questionnaire() {
     }
   };
 
-  // Render UI for initial stage selection
   if (!stage) {
     return (
       <div className="p-6 max-w-md mx-auto">
@@ -199,7 +221,6 @@ export default function Questionnaire() {
     );
   }
 
-  // Render UI for selecting range within the stage type
   if (stage.type && !stage.range) {
     const ranges =
       stage.type === "pregnant"
@@ -222,12 +243,10 @@ export default function Questionnaire() {
     );
   }
 
-  // Loading state
   if (loading) {
     return <p className="p-6 text-center">⏳ Loading questions...</p>;
   }
 
-  // Load error state
   if (loadError) {
     return (
       <div className="p-6 max-w-md mx-auto text-red-600">
@@ -243,7 +262,6 @@ export default function Questionnaire() {
     );
   }
 
-  // Finished state
   if (finished) {
     return (
       <div className="p-6 max-w-md mx-auto text-center">
@@ -260,10 +278,8 @@ export default function Questionnaire() {
     );
   }
 
-  // Current question object
   const current = loadedQuestions[currentId];
 
-  // If current question missing
   if (!current) {
     return (
       <div className="p-6 text-center text-red-600">
@@ -279,7 +295,6 @@ export default function Questionnaire() {
     );
   }
 
-  // Main question display
   return (
     <div className="p-6 max-w-md mx-auto">
       <p className="text-gray-500 mb-1">
