@@ -25,7 +25,7 @@ const Sidebar = ({ role }) => {
   if (!role || role === "patient") return null;
 
   const toggleSidebar = () => setCollapsed(prev => !prev);
-  const logout = () => navigate("/login");
+  const logout = () => navigate("/");
 
   const dashboardPath = {
     doctor: "/doctor-dashboard",
