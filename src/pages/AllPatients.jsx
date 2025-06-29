@@ -23,39 +23,46 @@ export default function AllPatients() {
   const [lastDoc, setLastDoc] = useState(null);
   const [hasMore, setHasMore] = useState(true);
 
+  const [doctorsMap, setDoctorsMap] = useState({});
+  const [hospitalsMap, setHospitalsMap] = useState({});
+
   const navigate = useNavigate();
   const loaderRef = useRef();
 
-  // 1. Fetch current user's hospitalId
   useEffect(() => {
     const fetchHospitalId = async () => {
-      try {
-        const uid = auth.currentUser?.uid;
-        if (!uid) {
-          console.warn("No auth user");
-          return;
-        }
-
-        const userDoc = await getDoc(doc(db, "users", uid));
-        const hId = userDoc.data()?.hospitalId;
-        console.log("Fetched hospitalId:", hId);
-        setHospitalId(hId);
-      } catch (err) {
-        console.error("Error fetching hospitalId:", err);
-      }
+      const uid = auth.currentUser?.uid;
+      if (!uid) return;
+      const userDoc = await getDoc(doc(db, "users", uid));
+      const hId = userDoc.data()?.hospitalId;
+      setHospitalId(hId);
     };
     fetchHospitalId();
   }, []);
 
-  // 2. Load patients
-  const fetchPatients = async (reset = false) => {
-    if (!hospitalId) {
-      console.warn("Skipped fetchPatients: hospitalId not ready.");
-      return;
-    }
+  // Load doctors and hospitals once
+  useEffect(() => {
+    const loadMaps = async () => {
+      const doctorSnap = await getDocs(collection(db, "doctors"));
+      const doctorMap = {};
+      doctorSnap.forEach(d => {
+        doctorMap[d.id] = d.data().fullName || "—";
+      });
+      setDoctorsMap(doctorMap);
 
+      const hospitalSnap = await getDocs(collection(db, "hospitals"));
+      const hospitalMap = {};
+      hospitalSnap.forEach(h => {
+        hospitalMap[h.id] = h.data().name || "—";
+      });
+      setHospitalsMap(hospitalMap);
+    };
+    loadMaps();
+  }, []);
+
+  const fetchPatients = async (reset = false) => {
+    if (!hospitalId) return;
     setLoading(true);
-    console.log(`Fetching patients (reset: ${reset})...`);
 
     try {
       let q = query(
@@ -69,8 +76,6 @@ export default function AllPatients() {
       const snap = await getDocs(q);
       const fetched = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       const nextLastDoc = snap.docs[snap.docs.length - 1] || null;
-
-      console.log("Fetched docs:", fetched.length, "Next lastDoc:", nextLastDoc?.id || null);
 
       const filtered = search.trim()
         ? fetched.filter(p => {
@@ -93,23 +98,18 @@ export default function AllPatients() {
     }
   };
 
-  // 3. Trigger fetch on hospitalId or search change
   useEffect(() => {
     if (!hospitalId) return;
-
     setPatients([]);
     setLastDoc(null);
     setHasMore(true);
-
     fetchPatients(true);
   }, [hospitalId, search]);
 
-  // 4. Infinite Scroll
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && !loading && hasMore) {
-          console.log("Triggering more fetch...");
           fetchPatients(false);
         }
       },
@@ -121,61 +121,63 @@ export default function AllPatients() {
     return () => current && observer.unobserve(current);
   }, [loading, hasMore, lastDoc, hospitalId]);
 
+  // Age calculation
+  const getAge = (dobString) => {
+    if (!dobString) return "—";
+    const dob = new Date(dobString);
+    const ageDifMs = Date.now() - dob.getTime();
+    const ageDate = new Date(ageDifMs);
+    return Math.abs(ageDate.getUTCFullYear() - 1970);
+  };
+
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-4">
-      <h1 className="text-2xl font-bold text-blue-700">All Registered Patients</h1>
+    <div className="overflow-x-auto bg-white rounded shadow">
+  <table className="min-w-full text-sm">
+    <thead className="bg-gray-100 text-gray-600 uppercase text-xs">
+      <tr>
+        <th className="px-4 py-3">Code</th>
+        <th className="px-4 py-3">Name</th>
+        <th className="px-4 py-3">Age</th>
+        <th className="px-4 py-3">Phone</th>
+        <th className="px-4 py-3">Village</th>
+        <th className="px-4 py-3">Hospital</th>
+        <th className="px-4 py-3">Doctor</th>
+        <th className="px-4 py-3">Profile</th>
+      </tr>
+    </thead>
+    <tbody>
+      {patients.map((p) => (
+        <tr key={p.id} className="border-t hover:bg-gray-50">
+          <td className="px-4 py-2">{p.patientCode || "—"}</td>
+          <td className="px-4 py-2">{p.fullName || "—"}</td>
+          <td className="px-4 py-2">{getAge(p.dob)}</td>
+          <td className="px-4 py-2">{p.phone || "—"}</td>
+          <td className="px-4 py-2">{p.village || "—"}</td>
+          <td className="px-4 py-2">{hospitalsMap[p.hospitalId] || "—"}</td>
+          <td className="px-4 py-2">{doctorsMap[p.registeringDoctor] || "—"}</td>
+          <td className="px-4 py-2">
+            <button
+              onClick={() => navigate(`/patient/${p.id}`)}
+              className="text-blue-600 hover:underline"
+            >
+              View
+            </button>
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
 
-      <input
-        type="text"
-        placeholder="Search by name, phone, or code"
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-        className="w-full md:w-1/2 px-4 py-2 border rounded shadow"
-      />
+  <div ref={loaderRef} className="text-center text-sm text-gray-500 py-4">
+    {loading
+      ? "Loading..."
+      : !patients.length
+      ? "No patients found."
+      : hasMore
+      ? "Scroll to load more..."
+      : "End of list."}
+  </div>
+</div>
 
-      <div className="overflow-x-auto bg-white rounded shadow">
-        <table className="min-w-full text-sm">
-          <thead className="bg-gray-100 text-gray-600 uppercase text-xs">
-            <tr>
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Phone</th>
-              <th className="px-4 py-3">DOB</th>
-              <th className="px-4 py-3">Village</th>
-              <th className="px-4 py-3">Hospital</th>
-              <th className="px-4 py-3">Profile</th>
-            </tr>
-          </thead>
-          <tbody>
-            {patients.map(p => (
-              <tr key={p.id} className="border-t hover:bg-gray-50">
-                <td className="px-4 py-2">{p.fullName || "—"}</td>
-                <td className="px-4 py-2">{p.phone || "—"}</td>
-                <td className="px-4 py-2">{p.dob || "—"}</td>
-                <td className="px-4 py-2">{p.village || "—"}</td>
-                <td className="px-4 py-2">{p.hospitalId || "—"}</td>
-                <td className="px-4 py-2">
-                  <button
-                    onClick={() => navigate(`/patient/${p.id}`)}
-                    className="text-blue-600 hover:underline"
-                  >
-                    View
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        <div ref={loaderRef} className="text-center text-sm text-gray-500 py-4">
-          {loading
-            ? "Loading..."
-            : !patients.length
-            ? "No patients found."
-            : hasMore
-            ? "Scroll to load more..."
-            : "End of list."}
-        </div>
-      </div>
-    </div>
   );
 }
