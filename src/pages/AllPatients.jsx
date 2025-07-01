@@ -20,6 +20,7 @@ export default function AllPatients() {
   const [loading, setLoading] = useState(false);
   const [hospitalId, setHospitalId] = useState(null);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [lastDoc, setLastDoc] = useState(null);
   const [hasMore, setHasMore] = useState(true);
   const [doctorsMap, setDoctorsMap] = useState({});
@@ -32,13 +33,11 @@ export default function AllPatients() {
   useEffect(() => {
     const fetchHospitalId = async () => {
       const uid = auth.currentUser?.uid;
-      console.log("Auth UID:", uid);
       if (!uid) return;
 
       try {
         const userDoc = await getDoc(doc(db, "users", uid));
         const hId = userDoc.data()?.hospitalId;
-        console.log("Fetched hospitalId:", hId);
         setHospitalId(hId);
       } catch (error) {
         console.error("Error fetching user document:", error);
@@ -46,6 +45,14 @@ export default function AllPatients() {
     };
     fetchHospitalId();
   }, []);
+
+  // Debounce search input
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search.trim().toLowerCase());
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [search]);
 
   // Load doctors and hospitals mapping
   useEffect(() => {
@@ -73,14 +80,9 @@ export default function AllPatients() {
 
   // Fetch patients (initial and paginated)
   const fetchPatients = async (reset = false) => {
-    if (!hospitalId) {
-      console.warn("fetchPatients called without hospitalId");
-      return;
-    }
+    if (!hospitalId) return;
 
     setLoading(true);
-    console.log("Fetching patients...", { reset, hospitalId });
-
     try {
       let q = query(
         collection(db, "patients"),
@@ -94,20 +96,13 @@ export default function AllPatients() {
       const fetched = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       const nextLastDoc = snap.docs[snap.docs.length - 1] || null;
 
-      console.log("Fetched from Firestore:", fetched);
-
-      const term = search.trim().toLowerCase();
-      const filtered = term
-        ? fetched.filter((p) => {
-            return (
-              p.fullName?.toLowerCase().includes(term) ||
-              p.phone?.includes(term) ||
-              String(p.patientCode || "").includes(term)
-            );
-          })
+      const filtered = debouncedSearch
+        ? fetched.filter((p) =>
+            (p.fullName || "").toLowerCase().includes(debouncedSearch) ||
+            (p.phone || "").includes(debouncedSearch) ||
+            String(p.patientCode || "").includes(debouncedSearch)
+          )
         : fetched;
-
-      console.log("Filtered patients:", filtered);
 
       setPatients((prev) => (reset ? filtered : [...prev, ...filtered]));
       setLastDoc(nextLastDoc);
@@ -126,14 +121,13 @@ export default function AllPatients() {
     setLastDoc(null);
     setHasMore(true);
     fetchPatients(true);
-  }, [hospitalId, search]);
+  }, [hospitalId, debouncedSearch]);
 
   // Infinite scroll observer
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && !loading && hasMore) {
-          console.log("Loader visible. Fetching next page...");
           fetchPatients(false);
         }
       },
@@ -159,6 +153,16 @@ export default function AllPatients() {
 
   return (
     <div className="overflow-x-auto bg-white rounded shadow">
+      <div className="p-4">
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by name, phone, or code"
+          className="w-full p-2 mb-4 border border-gray-300 rounded"
+        />
+      </div>
+
       <table className="min-w-full text-sm">
         <thead className="bg-gray-100 text-gray-600 uppercase text-xs">
           <tr>
